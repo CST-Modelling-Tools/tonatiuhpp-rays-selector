@@ -105,12 +105,12 @@ SelectedPower
 
 ## Visualization Utility
 
-The repository includes `tools/visualize_scaped_rays.py` for inspection and debugging of escaped-ray datasets.
+The repository includes `tools/visualize_escaped_rays.py` for inspection and debugging of escaped-ray datasets.
 
 Example usage:
 
 ```powershell
-python tools/visualize_scaped_rays.py escaped_rays.dat --length 5 --max-rays 2000
+python tools/visualize_escaped_rays.py escaped_rays.dat --length 5 --max-rays 2000
 ```
 
 `--length` controls the displayed ray length. `--max-rays` limits the number of displayed rays.
