@@ -1,0 +1,17 @@
+START PARAMETERS
+x
+y
+z
+dx
+dy
+dz
+END PARAMETERS
+
+SelectedRays
+2
+
+PowerPerRay
+12.5
+
+SelectedPower
+25

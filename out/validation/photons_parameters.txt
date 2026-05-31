@@ -1,0 +1,17 @@
+START PARAMETERS
+id
+x
+y
+z
+side
+previous ID
+next ID
+surface ID
+END PARAMETERS
+START SURFACES
+0 Air
+2 /scene/mirror_a
+4 /scene/mirror_zero
+5 /scene/mirror_b
+END SURFACES
+12.5

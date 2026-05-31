@@ -1,0 +1,21 @@
+{
+  "version": 3,
+  "configurePresets": [
+    {
+      "name": "msvc-ninja-release",
+      "displayName": "MSVC Ninja Release",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "build-release",
+      "displayName": "Build Release",
+      "configurePreset": "msvc-ninja-release"
+    }
+  ]
+}
