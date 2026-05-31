@@ -14,9 +14,14 @@ The tool operates on exported photon files and reconstructs complete rays using 
 
 The long-term objective is to support multiple ray-selection criteria and specialized output formats for optical analysis.
 
-## Current Priority
+## Current Priorities
 
-Validate the escaped-reflected-ray selector on representative Tonatiuh++ exports and harden the compact output workflow as needed.
+Current work is validation-oriented:
+
+* validate escaped-ray detection on representative Tonatiuh++ projects;
+* validate power accounting;
+* validate performance on large datasets;
+* evaluate additional future selection criteria.
 
 A ray is currently considered selected when:
 
@@ -61,6 +66,25 @@ where:
 * No full ray-database construction.
 * Suitable for millions of rays.
 
+### Escaped-Ray Output
+
+The primary output mode writes `<output_prefix>.dat` with one compact record per selected escaping reflected ray.
+
+Each record contains six binary `double` values:
+
+```text
+x
+y
+z
+dx
+dy
+dz
+```
+
+where `(x,y,z)` is the last non-air intersection point and `(dx,dy,dz)` is the normalized outgoing direction.
+
+The companion `<output_prefix>_parameters.txt` file records the field list plus `SelectedRays`, `PowerPerRay`, and `SelectedPower`.
+
 ## Current Output Format
 
 Binary output:
@@ -102,9 +126,10 @@ Contains:
 * Tonatiuh++ parameter-file reader migrated.
 * Support for split photon files preserved.
 * Initial ray reconstruction logic available.
-* Escaped-reflected-ray selector implemented as the primary output mode.
-* Compact escaped-ray binary output implemented as six doubles per selected ray.
+* Escaped-reflected-ray selector implemented.
+* Compact escaped-ray binary output format implemented.
 * Minimal synthetic functional validation completed for compact escaped-ray output.
+* Escaped-ray visualization utility added.
 
 ## Known Technical Debt
 

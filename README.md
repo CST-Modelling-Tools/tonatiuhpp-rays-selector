@@ -63,4 +63,54 @@ The program writes:
 <output_prefix>_parameters.txt
 ```
 
-The `.dat` file contains exactly six binary `double` values per selected ray. The parameters file includes the compact record field list, selected ray count, power per ray, and selected power.
+## Escaped-Ray Output Format
+
+`<output_prefix>.dat` contains one record per selected escaping reflected ray. Each record contains six binary `double` values:
+
+```text
+x
+y
+z
+dx
+dy
+dz
+```
+
+where:
+
+- `(x,y,z)` is the last non-air intersection point,
+- `(dx,dy,dz)` is the normalized outgoing direction.
+
+`<output_prefix>_parameters.txt` describes the compact record layout and selected-power summary:
+
+```text
+START PARAMETERS
+x
+y
+z
+dx
+dy
+dz
+END PARAMETERS
+
+SelectedRays
+<number>
+
+PowerPerRay
+<value>
+
+SelectedPower
+<SelectedRays * PowerPerRay>
+```
+
+## Visualization Utility
+
+The repository includes `tools/visualize_scaped_rays.py` for inspection and debugging of escaped-ray datasets.
+
+Example usage:
+
+```powershell
+python tools/visualize_scaped_rays.py escaped_rays.dat --length 5 --max-rays 2000
+```
+
+`--length` controls the displayed ray length. `--max-rays` limits the number of displayed rays.
