@@ -151,66 +151,143 @@ def choose_norm(flux, vmax, log_scale, mpl_colors):
     return mpl_colors.LogNorm(vmin=vmin, vmax=norm_vmax)
 
 
+def degree_label(value):
+    return f"{value:g}\N{DEGREE SIGN}"
+
+
+def contour_levels(flux):
+    max_flux = float(np.max(flux)) if flux.size else 0.0
+    min_flux = float(np.min(flux)) if flux.size else 0.0
+    if max_flux <= 0.0 or max_flux <= min_flux:
+        return []
+
+    levels = [max_flux * fraction for fraction in (0.10, 0.25, 0.50, 0.75, 0.90)]
+    return [level for level in levels if min_flux < level < max_flux]
+
+
 def write_plot(path, radius, az_edges, zenith_edges, flux, total_power, rays_used, args):
     mpl_colors, plt = require_matplotlib()
     theta_edges = np.radians(az_edges)
-    radius_edges = zenith_edges
-    theta_grid, radius_grid = np.meshgrid(theta_edges, radius_edges, indexing="xy")
+    zenith_edge_grid, theta_edge_grid = np.meshgrid(zenith_edges, theta_edges, indexing="ij")
     plot_values = np.ma.masked_less_equal(flux.T, 0.0) if args.log_scale else flux.T
 
-    fig, ax = plt.subplots(figsize=(8, 8), subplot_kw={"projection": "polar"})
+    fig, ax = plt.subplots(figsize=(10, 9), subplot_kw={"projection": "polar"}, constrained_layout=True)
     ax.set_theta_zero_location("N")
     ax.set_theta_direction(-1)
     ax.set_ylim(0.0, 90.0)
-    ax.set_yticks([0, 15, 30, 45, 60, 75, 90])
-    ax.set_yticklabels(["0", "15", "30", "45", "60", "75", "90"])
+    elevation_ticks = [90, 75, 60, 45, 30, 15, 0]
+    zenith_ticks = [90.0 - elevation for elevation in elevation_ticks]
+    ax.set_yticks(zenith_ticks)
+    ax.set_yticklabels([degree_label(elevation) for elevation in elevation_ticks])
     ax.set_rlabel_position(225)
-    ax.grid(True, alpha=0.35)
+    ax.set_thetagrids([0, 90, 180, 270], labels=["N", "E", "S", "W"])
+    ax.tick_params(axis="x", labelsize=12, pad=8)
+    ax.tick_params(axis="y", labelsize=9, pad=3)
+    for label in ax.get_yticklabels():
+        label.set_bbox({"facecolor": "white", "edgecolor": "none", "alpha": 0.65, "pad": 1.5})
+    for label in ax.get_xticklabels():
+        label.set_fontweight("bold")
+    ax.grid(True, color="#9a9a9a", linewidth=0.55, alpha=0.5)
 
     mesh = ax.pcolormesh(
-        theta_grid,
-        radius_grid,
+        theta_edge_grid,
+        zenith_edge_grid,
         plot_values,
         cmap="inferno",
         norm=choose_norm(flux, args.vmax, args.log_scale, mpl_colors),
         shading="auto",
     )
-    colorbar = fig.colorbar(mesh, ax=ax, pad=0.1)
-    colorbar.set_label("Flux [W/m²]")
+    colorbar = fig.colorbar(mesh, ax=ax, pad=0.08, shrink=0.86)
+    colorbar.set_label("Flux [W/m$^2$]")
 
     max_index = np.unravel_index(np.argmax(flux), flux.shape)
     az_centers = 0.5 * (az_edges[:-1] + az_edges[1:])
     zenith_centers = 0.5 * (zenith_edges[:-1] + zenith_edges[1:])
     max_flux = flux[max_index]
     max_azimuth = az_centers[max_index[0]]
-    max_elevation = 90.0 - zenith_centers[max_index[1]]
+    max_zenith = zenith_centers[max_index[1]]
+    max_elevation = 90.0 - max_zenith
+
+    levels = contour_levels(flux)
+    if levels:
+        theta_centers = np.radians(az_centers)
+        zenith_center_grid, theta_center_grid = np.meshgrid(zenith_centers, theta_centers, indexing="ij")
+        ax.contour(
+            theta_center_grid,
+            zenith_center_grid,
+            flux.T,
+            levels=levels,
+            colors="white",
+            linewidths=0.75,
+            alpha=0.75,
+        )
+
+    if max_flux > 0.0:
+        max_theta = math.radians(max_azimuth)
+        ax.scatter(
+            max_theta,
+            max_zenith,
+            marker="o",
+            s=58,
+            facecolors="none",
+            edgecolors="white",
+            linewidths=1.4,
+            zorder=6,
+        )
+        annotation_text = (
+            f"Max flux = {max_flux:.4g} W/m$^2$\n"
+            f"Az = {max_azimuth:.1f}\N{DEGREE SIGN}\n"
+            f"El = {max_elevation:.1f}\N{DEGREE SIGN}"
+        )
+        ax.annotate(
+            annotation_text,
+            xy=(max_theta, max_zenith),
+            xytext=(24, 24),
+            textcoords="offset points",
+            fontsize=9,
+            color="black",
+            bbox={"boxstyle": "round,pad=0.3", "facecolor": "white", "edgecolor": "#555555", "alpha": 0.88},
+            arrowprops={"arrowstyle": "->", "color": "white", "linewidth": 1.0},
+            zorder=7,
+        )
 
     if args.sun_azimuth_deg is not None and args.sun_elevation_deg is not None:
         sun_zenith = 90.0 - args.sun_elevation_deg
         if 0.0 <= sun_zenith <= 90.0:
+            sun_theta = math.radians(args.sun_azimuth_deg)
             ax.scatter(
-                math.radians(args.sun_azimuth_deg),
+                sun_theta,
                 sun_zenith,
                 marker="*",
-                s=180,
-                c="cyan",
+                s=340,
+                c="gold",
                 edgecolors="black",
-                linewidths=0.8,
+                linewidths=1.0,
                 label="Sun",
-                zorder=5,
+                zorder=8,
             )
-            ax.text(math.radians(args.sun_azimuth_deg), sun_zenith, " Sun", color="cyan", weight="bold")
+            ax.annotate(
+                "Sun",
+                xy=(sun_theta, sun_zenith),
+                xytext=(10, 10),
+                textcoords="offset points",
+                fontsize=10,
+                weight="bold",
+                color="black",
+                bbox={"facecolor": "white", "edgecolor": "none", "alpha": 0.75, "pad": 1.5},
+                zorder=9,
+            )
 
     title = (
         f"Hemisphere flux, R = {radius:g} m\n"
-        f"max {max_flux:.6g} W/m² at az {max_azimuth:.2f}°, elev {max_elevation:.2f}°; "
+        f"max {max_flux:.6g} W/m$^2$ at az {max_azimuth:.2f}\N{DEGREE SIGN}, "
+        f"elev {max_elevation:.2f}\N{DEGREE SIGN}; "
         f"power {total_power:.6g} W; rays {rays_used}"
     )
     if args.dni is not None:
-        title += f"\nDNI = {args.dni:g} W/m²"
-    ax.set_title(title)
+        title += f"\nDNI = {args.dni:g} W/m$^2$"
+    ax.set_title(title, fontsize=12, pad=20)
 
-    fig.tight_layout()
     fig.savefig(path, dpi=180)
     plt.close(fig)
 

@@ -137,3 +137,5 @@ For each radius, the tool writes:
 ```
 
 The CSV reports azimuth, elevation, zenith, ray count, power, and flux for each bin. The PNG uses architectural sky-dome convention: zenith at the center, horizon at the outer circle, 0 degrees azimuth at North, 90 degrees at East, and azimuth increasing clockwise.
+
+The polar PNG includes elevation-labelled radial rings, N/E/S/W perimeter labels, contour lines over the flux color map, and an automatic maximum-flux annotation. If `--sun-azimuth-deg` and `--sun-elevation-deg` are provided, the map shows a labelled Sun marker. If `--dni` is provided, the DNI value is included in the title. Use `--vmax <value>` to apply a fixed color-scale maximum across all requested radii for visual comparison.
