@@ -85,6 +85,11 @@ where `(x,y,z)` is the last non-air intersection point and `(dx,dy,dz)` is the n
 
 The companion `<output_prefix>_parameters.txt` file records the field list plus `SelectedRays`, `PowerPerRay`, and `SelectedPower`.
 
+### Analysis Tools
+
+* `tools/visualize_escaped_rays.py` visualizes compact escaped-ray records for inspection and debugging.
+* `tools/map_escaped_flux_hemisphere.py` maps compact escaped-ray records onto sky-dome hemispheres and writes polar flux PNG and CSV outputs for one or more radii.
+
 ## Current Output Format
 
 Binary output:
@@ -130,6 +135,8 @@ Contains:
 * Compact escaped-ray binary output format implemented.
 * Minimal synthetic functional validation completed for compact escaped-ray output.
 * Escaped-ray visualization utility added.
+* Escaped-ray hemisphere flux mapping utility added.
+* Synthetic hemisphere flux validation completed with PNG and CSV output.
 
 ## Known Technical Debt
 
@@ -143,6 +150,7 @@ Contains:
 * Verify ray counts against manually inspected datasets.
 * Verify power accounting.
 * Validate performance on multi-million-ray datasets.
+* Validate hemisphere flux maps on representative real escaped-ray datasets.
 
 ## Recommended Next Milestones
 

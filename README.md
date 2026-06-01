@@ -114,3 +114,26 @@ python tools/visualize_escaped_rays.py escaped_rays.dat --length 5 --max-rays 20
 ```
 
 `--length` controls the displayed ray length. `--max-rays` limits the number of displayed rays.
+
+## Hemisphere Flux Mapping
+
+The repository includes `tools/map_escaped_flux_hemisphere.py` to map compact escaped-ray records onto one or more sky-dome hemispheres and write polar flux maps.
+
+This tool requires NumPy and Matplotlib.
+
+Example usage:
+
+```powershell
+python tools\map_escaped_flux_hemisphere.py stray_rays.dat --radius 50 100 200 --az-bins 180 --zenith-bins 90 --sun-azimuth-deg 135 --sun-elevation-deg 42 --dni 860 --output-dir hemisphere_flux
+```
+
+The tool reads `x y z dx dy dz` records from a big-endian binary `.dat` file and reads `PowerPerRay` from the matching `<input_prefix>_parameters.txt` file. Use `--power-per-ray <value>` to override the metadata value.
+
+For each radius, the tool writes:
+
+```text
+<output_dir>/hemisphere_flux_R<radius>m.png
+<output_dir>/hemisphere_flux_R<radius>m.csv
+```
+
+The CSV reports azimuth, elevation, zenith, ray count, power, and flux for each bin. The PNG uses architectural sky-dome convention: zenith at the center, horizon at the outer circle, 0 degrees azimuth at North, 90 degrees at East, and azimuth increasing clockwise.
