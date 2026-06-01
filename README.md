@@ -137,6 +137,8 @@ Example usage:
 
 The tool reads `x y z dx dy dz` records from a big-endian binary `.dat` file and reads `PowerPerRay` from the matching `<input_prefix>_parameters.txt` file. Use `--power-per-ray <value>` to override the metadata value.
 
+By default, outputs are written next to the input escaped-ray file. Use `--output-dir <path>` to redirect all generated maps and CSV files elsewhere.
+
 For each radius, the tool writes:
 
 ```text

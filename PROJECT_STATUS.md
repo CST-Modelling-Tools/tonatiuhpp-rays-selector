@@ -138,6 +138,7 @@ Contains:
 * Escaped-ray hemisphere flux mapping utility added.
 * Synthetic hemisphere flux validation completed with PNG and CSV output.
 * Hemisphere flux PNG maps refined with elevation labels, 30-degree azimuth grid labels, cardinal labels, contour overlays, yellow disk sun marker, DNI annotation, fixed-scale support, hotspot annotation, and report-style two-line titles.
+* Hemisphere flux mapper now writes outputs next to the input escaped-ray file by default while preserving `--output-dir` overrides.
 
 ## Known Technical Debt
 

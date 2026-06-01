@@ -325,7 +325,7 @@ def parse_args():
     parser.add_argument("--az-bins", type=int, default=180)
     parser.add_argument("--zenith-bins", type=int, default=90)
     parser.add_argument("--power-per-ray", type=float, default=None, help="Override metadata PowerPerRay value.")
-    parser.add_argument("--output-dir", default="hemisphere_flux")
+    parser.add_argument("--output-dir", default=None)
     parser.add_argument("--sun-azimuth-deg", type=float, default=None)
     parser.add_argument("--sun-elevation-deg", type=float, default=None)
     parser.add_argument("--dni", type=float, default=None)
@@ -355,7 +355,7 @@ def main():
 
     rays = read_escaped_rays(input_file)
     center = np.array(args.center, dtype=np.float64)
-    output_dir = Path(args.output_dir)
+    output_dir = input_file.parent if args.output_dir is None else Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
     print(f"Loaded {len(rays)} finite escaped-ray records")
