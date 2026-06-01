@@ -137,7 +137,7 @@ Contains:
 * Escaped-ray visualization utility added.
 * Escaped-ray hemisphere flux mapping utility added.
 * Synthetic hemisphere flux validation completed with PNG and CSV output.
-* Hemisphere flux PNG maps refined with elevation labels, cardinal labels, contour overlays, sun marker, DNI annotation, fixed-scale support, and hotspot annotation.
+* Hemisphere flux PNG maps refined with elevation labels, 30-degree azimuth grid labels, cardinal labels, contour overlays, yellow disk sun marker, DNI annotation, fixed-scale support, hotspot annotation, and report-style two-line titles.
 
 ## Known Technical Debt
 

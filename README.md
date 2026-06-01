@@ -124,7 +124,15 @@ This tool requires NumPy and Matplotlib.
 Example usage:
 
 ```powershell
-python tools\map_escaped_flux_hemisphere.py stray_rays.dat --radius 50 100 200 --az-bins 180 --zenith-bins 90 --sun-azimuth-deg 135 --sun-elevation-deg 42 --dni 860 --output-dir hemisphere_flux
+.\.venv\Scripts\python.exe tools\map_escaped_flux_hemisphere.py `
+"path\to\stray_rays.dat" `
+--radius 25 50 100 200 300 400 500 1000 `
+--az-bins 180 `
+--zenith-bins 90 `
+--sun-azimuth-deg 178.59 `
+--sun-elevation-deg 27.48 `
+--dni 934.09 `
+--output-dir hemisphere_flux
 ```
 
 The tool reads `x y z dx dy dz` records from a big-endian binary `.dat` file and reads `PowerPerRay` from the matching `<input_prefix>_parameters.txt` file. Use `--power-per-ray <value>` to override the metadata value.
@@ -138,4 +146,4 @@ For each radius, the tool writes:
 
 The CSV reports azimuth, elevation, zenith, ray count, power, and flux for each bin. The PNG uses architectural sky-dome convention: zenith at the center, horizon at the outer circle, 0 degrees azimuth at North, 90 degrees at East, and azimuth increasing clockwise.
 
-The polar PNG includes elevation-labelled radial rings, N/E/S/W perimeter labels, contour lines over the flux color map, and an automatic maximum-flux annotation. If `--sun-azimuth-deg` and `--sun-elevation-deg` are provided, the map shows a labelled Sun marker. If `--dni` is provided, the DNI value is included in the title. Use `--vmax <value>` to apply a fixed color-scale maximum across all requested radii for visual comparison.
+The polar PNG includes elevation-labelled radial rings, 30-degree azimuth grid lines with N/E/S/W labels, contour lines over the flux color map, a two-line report-style title, and an automatic maximum-flux annotation. If `--sun-azimuth-deg` and `--sun-elevation-deg` are provided, the map shows a labelled yellow Sun disk. If `--dni` is provided, the DNI value is included in the title. Use `--vmax <value>` to apply a fixed color-scale maximum across all requested radii for visual comparison.

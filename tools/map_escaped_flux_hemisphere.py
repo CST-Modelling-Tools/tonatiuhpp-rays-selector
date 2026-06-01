@@ -155,6 +155,28 @@ def degree_label(value):
     return f"{value:g}\N{DEGREE SIGN}"
 
 
+def ordinal_degree_label(value):
+    return f"{value:g}\N{MASCULINE ORDINAL INDICATOR}"
+
+
+def azimuth_grid_labels():
+    labels = []
+    for azimuth in range(0, 360, 30):
+        cardinal = {0: "N", 90: "E", 180: "S", 270: "W"}.get(azimuth)
+        numeric = degree_label(azimuth)
+        labels.append(f"{cardinal}\n{numeric}" if cardinal else numeric)
+    return labels
+
+
+def title_line_one(radius, args):
+    dni_text = f"{args.dni:g} W/m²" if args.dni is not None else "not provided"
+    if args.sun_azimuth_deg is not None and args.sun_elevation_deg is not None:
+        sun_text = f"az = {args.sun_azimuth_deg:g}, elev = {args.sun_elevation_deg:g}"
+    else:
+        sun_text = "not provided"
+    return f"Hemisphere flux, R = {radius:g} m; DNI = {dni_text}; Sun position: {sun_text}"
+
+
 def contour_levels(flux):
     max_flux = float(np.max(flux)) if flux.size else 0.0
     min_flux = float(np.min(flux)) if flux.size else 0.0
@@ -166,6 +188,7 @@ def contour_levels(flux):
 
 
 def write_plot(path, radius, az_edges, zenith_edges, flux, total_power, rays_used, args):
+    _ = total_power, rays_used
     mpl_colors, plt = require_matplotlib()
     theta_edges = np.radians(az_edges)
     zenith_edge_grid, theta_edge_grid = np.meshgrid(zenith_edges, theta_edges, indexing="ij")
@@ -180,7 +203,8 @@ def write_plot(path, radius, az_edges, zenith_edges, flux, total_power, rays_use
     ax.set_yticks(zenith_ticks)
     ax.set_yticklabels([degree_label(elevation) for elevation in elevation_ticks])
     ax.set_rlabel_position(225)
-    ax.set_thetagrids([0, 90, 180, 270], labels=["N", "E", "S", "W"])
+    azimuth_ticks = list(range(0, 360, 30))
+    ax.set_thetagrids(azimuth_ticks, labels=azimuth_grid_labels())
     ax.tick_params(axis="x", labelsize=12, pad=8)
     ax.tick_params(axis="y", labelsize=9, pad=3)
     for label in ax.get_yticklabels():
@@ -235,7 +259,7 @@ def write_plot(path, radius, az_edges, zenith_edges, flux, total_power, rays_use
             zorder=6,
         )
         annotation_text = (
-            f"Max flux = {max_flux:.4g} W/m$^2$\n"
+            f"Max flux = {max_flux:.2f} W/m$^2$\n"
             f"Az = {max_azimuth:.1f}\N{DEGREE SIGN}\n"
             f"El = {max_elevation:.1f}\N{DEGREE SIGN}"
         )
@@ -258,8 +282,8 @@ def write_plot(path, radius, az_edges, zenith_edges, flux, total_power, rays_use
             ax.scatter(
                 sun_theta,
                 sun_zenith,
-                marker="*",
-                s=340,
+                marker="o",
+                s=190,
                 c="gold",
                 edgecolors="black",
                 linewidths=1.0,
@@ -278,14 +302,13 @@ def write_plot(path, radius, az_edges, zenith_edges, flux, total_power, rays_use
                 zorder=9,
             )
 
-    title = (
-        f"Hemisphere flux, R = {radius:g} m\n"
-        f"max {max_flux:.6g} W/m$^2$ at az {max_azimuth:.2f}\N{DEGREE SIGN}, "
-        f"elev {max_elevation:.2f}\N{DEGREE SIGN}; "
-        f"power {total_power:.6g} W; rays {rays_used}"
-    )
-    if args.dni is not None:
-        title += f"\nDNI = {args.dni:g} W/m$^2$"
+    title = "\n".join((
+        title_line_one(radius, args),
+        (
+            f"Max. Flux = {max_flux:.2f} W/m² at az = {ordinal_degree_label(max_azimuth)}, "
+            f"elev = {ordinal_degree_label(max_elevation)}"
+        ),
+    ))
     ax.set_title(title, fontsize=12, pad=20)
 
     fig.savefig(path, dpi=180)
