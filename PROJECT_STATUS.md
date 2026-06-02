@@ -89,6 +89,7 @@ The companion `<output_prefix>_parameters.txt` file records the field list plus 
 
 * `tools/visualize_escaped_rays.py` visualizes compact escaped-ray records for inspection and debugging.
 * `tools/map_escaped_flux_hemisphere.py` maps compact escaped-ray records onto sky-dome hemispheres and writes report-oriented polar flux PNG and CSV outputs for one or more radii.
+* `tools/aggregate_daily_hemisphere_energy.py` aggregates hourly hemisphere flux CSV files into daily sky-dome energy PNG and CSV outputs.
 
 ## Current Output Format
 
@@ -139,6 +140,7 @@ Contains:
 * Synthetic hemisphere flux validation completed with PNG and CSV output.
 * Hemisphere flux PNG maps refined with elevation labels, 30-degree azimuth grid labels, cardinal labels, contour overlays, yellow disk sun marker, DNI annotation, fixed-scale support, hotspot annotation, and report-style two-line titles.
 * Hemisphere flux mapper now writes outputs next to the input escaped-ray file by default while preserving `--output-dir` overrides.
+* Daily hemisphere energy aggregation utility added and synthetically validated with matching hourly grids.
 
 ## Known Technical Debt
 

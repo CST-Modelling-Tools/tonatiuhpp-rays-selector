@@ -149,3 +149,20 @@ For each radius, the tool writes:
 The CSV reports azimuth, elevation, zenith, ray count, power, and flux for each bin. The PNG uses architectural sky-dome convention: zenith at the center, horizon at the outer circle, 0 degrees azimuth at North, 90 degrees at East, and azimuth increasing clockwise.
 
 The polar PNG includes elevation-labelled radial rings, 30-degree azimuth grid lines with N/E/S/W labels, contour lines over the flux color map, a two-line report-style title, and an automatic maximum-flux annotation. If `--sun-azimuth-deg` and `--sun-elevation-deg` are provided, the map shows a labelled yellow Sun disk. If `--dni` is provided, the DNI value is included in the title. Use `--vmax <value>` to apply a fixed color-scale maximum across all requested radii for visual comparison.
+
+## Daily Hemisphere Energy Aggregation
+
+Use `tools/aggregate_daily_hemisphere_energy.py` to aggregate hourly hemisphere flux CSV files into daily sky-dome energy maps.
+
+Example usage:
+
+```powershell
+.\.venv\Scripts\python.exe tools\aggregate_daily_hemisphere_energy.py `
+"D:\Solatom\Report\RayTracing\SpringEquinox" `
+--radius 25 50 100 200 300 400 500 1000 `
+--duration-hours 1
+```
+
+For each requested radius, the tool recursively finds matching `hemisphere_flux_R<radius>m.csv` files under the input folder. The hourly CSVs for a radius must use the same ordered azimuth, elevation, and zenith bin grid.
+
+Energy is computed as `flux_W_m2 * duration_hours`. Output CSV values are written in `Wh/m²` and `kWh/m²`. By default, daily outputs are written to the input day folder; use `--output-dir <path>` to redirect them.
