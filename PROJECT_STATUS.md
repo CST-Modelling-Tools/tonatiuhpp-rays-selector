@@ -141,6 +141,7 @@ Contains:
 * Hemisphere flux PNG maps refined with elevation labels, 30-degree azimuth grid labels, cardinal labels, contour overlays, yellow disk sun marker, DNI annotation, fixed-scale support, hotspot annotation, and report-style two-line titles.
 * Hemisphere flux mapper now writes outputs next to the input escaped-ray file by default while preserving `--output-dir` overrides.
 * Daily hemisphere energy aggregation utility added and synthetically validated with matching hourly grids.
+* Daily hemisphere energy aggregation now accepts prefixed hourly flux CSV filenames.
 
 ## Known Technical Debt
 

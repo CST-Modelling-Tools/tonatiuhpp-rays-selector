@@ -163,6 +163,6 @@ Example usage:
 --duration-hours 1
 ```
 
-For each requested radius, the tool recursively finds matching `hemisphere_flux_R<radius>m.csv` files under the input folder. The hourly CSVs for a radius must use the same ordered azimuth, elevation, and zenith bin grid.
+For each requested radius, the tool recursively finds matching `*hemisphere_flux_R<radius>m.csv` files under the input folder. Hourly CSV files may have prefixes such as `point_10_hemisphere_flux_R25m.csv`, as long as they end with `hemisphere_flux_R<radius>m.csv`. The hourly CSVs for a radius must use the same ordered azimuth, elevation, and zenith bin grid.
 
 Energy is computed as `flux_W_m2 * duration_hours`. Output CSV values are written in `Wh/m²` and `kWh/m²`. By default, daily outputs are written to the input day folder; use `--output-dir <path>` to redirect them.

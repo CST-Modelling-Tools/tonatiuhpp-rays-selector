@@ -290,7 +290,7 @@ def write_daily_plot(path, radius, data, args):
 
 
 def discover_files(input_folder, radius):
-    pattern = f"hemisphere_flux_R{radius_label(radius)}m.csv"
+    pattern = f"*hemisphere_flux_R{radius_label(radius)}m.csv"
     return sorted(input_folder.rglob(pattern))
 
 
