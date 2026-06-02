@@ -166,3 +166,18 @@ Example usage:
 For each requested radius, the tool recursively finds matching `*hemisphere_flux_R<radius>m.csv` files under the input folder. Hourly CSV files may have prefixes such as `point_10_hemisphere_flux_R25m.csv`, as long as they end with `hemisphere_flux_R<radius>m.csv`. The hourly CSVs for a radius must use the same ordered azimuth, elevation, and zenith bin grid.
 
 Energy is computed as `flux_W_m2 * duration_hours`. Output CSV values are written in `Wh/m²` and `kWh/m²`. By default, daily outputs are written to the input day folder; use `--output-dir <path>` to redirect them.
+
+## Daily Energy Concentration Analysis
+
+Use `tools/analyze_daily_energy_concentration.py` to quantify how tightly daily escaped energy is concentrated on the sky dome.
+
+Example usage:
+
+```powershell
+.\.venv\Scripts\python.exe tools\analyze_daily_energy_concentration.py `
+"D:\Solatom\Report\RayTracing\SpringEquinox"
+```
+
+The tool discovers `daily_hemisphere_energy_R<radius>m.csv` files, sorts radii numerically, and writes `daily_energy_concentration.csv`, `daily_energy_concentration.png`, and per-radius `daily_hemisphere_energy_R<radius>m_concentration.png` overlays in the input folder.
+
+`Theta90_max_deg` is the angular radius around the maximum-energy bin required to contain 90% of the summed daily sky-bin energy. `Theta90_centroid_deg` uses the same containment calculation around the energy-weighted spherical centroid direction. Smaller Theta90 values indicate tighter angular concentration; comparing the two metrics helps distinguish a compact dominant lobe from a broader or multi-lobe distribution.
