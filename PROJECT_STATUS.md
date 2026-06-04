@@ -2,7 +2,7 @@
 
 ## Last updated
 
-2026-06-02
+2026-06-03
 
 ## Purpose
 
@@ -90,7 +90,7 @@ The companion `<output_prefix>_parameters.txt` file records the field list plus 
 * `tools/visualize_escaped_rays.py` visualizes compact escaped-ray records for inspection and debugging.
 * `tools/map_escaped_flux_hemisphere.py` maps compact escaped-ray records onto sky-dome hemispheres and writes report-oriented polar flux PNG and CSV outputs for one or more radii.
 * `tools/aggregate_daily_hemisphere_energy.py` aggregates hourly hemisphere flux CSV files into daily sky-dome energy PNG and CSV outputs.
-* `tools/analyze_daily_energy_concentration.py` computes daily angular concentration metrics and plots Theta90 summaries plus per-radius containment overlays.
+* `tools/analyze_daily_energy_concentration.py` computes energy-ranked 90% daily concentration regions, solid-angle summaries, and per-radius irregular-region overlays.
 
 ## Current Output Format
 
@@ -144,6 +144,7 @@ Contains:
 * Daily hemisphere energy aggregation utility added and synthetically validated with matching hourly grids.
 * Daily hemisphere energy aggregation now accepts prefixed hourly flux CSV filenames.
 * Daily energy concentration analysis utility added and synthetically validated with a dominant-lobe dataset.
+* Daily energy concentration analysis now reports energy-ranked 90% sky regions using physical solid angle instead of symmetric circular containment regions, with single-lobe and disconnected two-lobe synthetic validation completed.
 
 ## Known Technical Debt
 

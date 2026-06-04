@@ -180,4 +180,6 @@ Example usage:
 
 The tool discovers `daily_hemisphere_energy_R<radius>m.csv` files, sorts radii numerically, and writes `daily_energy_concentration.csv`, `daily_energy_concentration.png`, and per-radius `daily_hemisphere_energy_R<radius>m_concentration.png` overlays in the input folder.
 
-`Theta90_max_deg` is the angular radius around the maximum-energy bin required to contain 90% of the summed daily sky-bin energy. `Theta90_centroid_deg` uses the same containment calculation around the energy-weighted spherical centroid direction. Smaller Theta90 values indicate tighter angular concentration; comparing the two metrics helps distinguish a compact dominant lobe from a broader or multi-lobe distribution.
+The concentration method ranks all sky bins from highest to lowest `energy_Wh_m2`, accumulates bins until they contain 90% of the total daily escaped energy, and reports the solid angle occupied by that irregular `Top90EnergyRegion`. The summary CSV includes hotspot, centroid, total energy, selected solid angle, hemisphere fraction, and selected-bin counts. Smaller `Top90SolidAngle_sr` or `Top90HemispherePercent` values indicate tighter daily energy concentration.
+
+The tool no longer uses symmetric containment angles around the hotspot or centroid. Per-radius overlay PNGs show the daily energy map, hotspot marker, centroid marker, and the irregular energy-ranked 90% region.

@@ -115,90 +115,6 @@ def vector_to_azimuth_elevation(vector):
     return azimuth, elevation
 
 
-def angular_distances_deg(vectors, center):
-    dots = np.clip(vectors @ center, -1.0, 1.0)
-    return np.degrees(np.arccos(dots))
-
-
-def containment_radius_deg(distances_deg, energy, fraction=0.90):
-    total = float(np.sum(energy))
-    if total <= 0.0:
-        return math.nan
-
-    order = np.argsort(distances_deg, kind="stable")
-    cumulative = np.cumsum(energy[order])
-    index = int(np.searchsorted(cumulative, fraction * total, side="left"))
-    index = min(index, order.size - 1)
-    return float(distances_deg[order[index]])
-
-
-def analyze_radius(radius, path):
-    data = read_daily_csv(path)
-    energy = data["energy_Wh_m2"]
-    vectors = unit_vectors(data["azimuth_center_deg"], data["elevation_center_deg"])
-    total_energy = float(np.sum(energy))
-
-    max_index = int(np.argmax(energy))
-    max_vector = vectors[max_index]
-    az_max = float(data["azimuth_center_deg"][max_index])
-    el_max = float(data["elevation_center_deg"][max_index])
-    theta90_max = containment_radius_deg(angular_distances_deg(vectors, max_vector), energy)
-
-    weighted_vector = np.sum(vectors * energy[:, np.newaxis], axis=0)
-    centroid_norm = np.linalg.norm(weighted_vector)
-    if total_energy > 0.0 and centroid_norm > 0.0 and np.isfinite(centroid_norm):
-        centroid_vector = weighted_vector / centroid_norm
-        az_centroid, el_centroid = vector_to_azimuth_elevation(centroid_vector)
-        theta90_centroid = containment_radius_deg(angular_distances_deg(vectors, centroid_vector), energy)
-    else:
-        centroid_vector = np.array([math.nan, math.nan, math.nan], dtype=np.float64)
-        az_centroid = math.nan
-        el_centroid = math.nan
-        theta90_centroid = math.nan
-
-    return {
-        "radius": radius,
-        "path": path,
-        "data": data,
-        "vectors": vectors,
-        "max_vector": max_vector,
-        "centroid_vector": centroid_vector,
-        "Az_max_deg": az_max,
-        "El_max_deg": el_max,
-        "Theta90_max_deg": theta90_max,
-        "Az_centroid_deg": az_centroid,
-        "El_centroid_deg": el_centroid,
-        "Theta90_centroid_deg": theta90_centroid,
-        "TotalEnergy_Wh_m2": total_energy,
-    }
-
-
-def write_summary_csv(path, results):
-    with path.open("w", newline="", encoding="utf-8") as file:
-        writer = csv.writer(file)
-        writer.writerow([
-            "Radius_m",
-            "Az_max_deg",
-            "El_max_deg",
-            "Theta90_max_deg",
-            "Az_centroid_deg",
-            "El_centroid_deg",
-            "Theta90_centroid_deg",
-            "TotalEnergy_Wh_m2",
-        ])
-        for result in results:
-            writer.writerow([
-                f"{result['radius']:.10g}",
-                f"{result['Az_max_deg']:.10g}",
-                f"{result['El_max_deg']:.10g}",
-                f"{result['Theta90_max_deg']:.10g}",
-                f"{result['Az_centroid_deg']:.10g}",
-                f"{result['El_centroid_deg']:.10g}",
-                f"{result['Theta90_centroid_deg']:.10g}",
-                f"{result['TotalEnergy_Wh_m2']:.17g}",
-            ])
-
-
 def center_edges(centers, lower, upper):
     centers = np.asarray(centers, dtype=np.float64)
     if centers.size == 1:
@@ -214,21 +130,154 @@ def center_edges(centers, lower, upper):
     return edges
 
 
-def grid_from_flat(data):
+def periodic_azimuth_edges(centers):
+    centers = np.asarray(centers, dtype=np.float64)
+    if centers.size == 1:
+        return np.array([centers[0] - 180.0, centers[0] + 180.0], dtype=np.float64)
+
+    previous_gap = centers[0] - (centers[-1] - 360.0)
+    next_gaps = np.diff(np.concatenate((centers, [centers[0] + 360.0])))
+    edges = np.empty(centers.size + 1, dtype=np.float64)
+    edges[0] = centers[0] - 0.5 * previous_gap
+    edges[1:] = centers + 0.5 * next_gaps
+    return edges
+
+
+def bin_solid_angles(data):
     azimuth_centers = np.unique(data["azimuth_center_deg"])
     zenith_centers = np.unique(data["zenith_center_deg"])
-    energy = np.full((azimuth_centers.size, zenith_centers.size), np.nan, dtype=np.float64)
+    azimuth_edges = periodic_azimuth_edges(azimuth_centers)
+    zenith_edges = center_edges(zenith_centers, 0.0, 90.0)
+
+    azimuth_widths = np.radians(np.diff(azimuth_edges))
+    zenith_inner = np.radians(zenith_edges[:-1])
+    zenith_outer = np.radians(zenith_edges[1:])
+    zenith_weights = np.cos(zenith_inner) - np.cos(zenith_outer)
+
+    azimuth_index = {value: index for index, value in enumerate(azimuth_centers)}
+    zenith_index = {value: index for index, value in enumerate(zenith_centers)}
+    solid_angles = np.empty(data["energy_Wh_m2"].size, dtype=np.float64)
+    for index, (azimuth, zenith) in enumerate(zip(data["azimuth_center_deg"], data["zenith_center_deg"])):
+        solid_angles[index] = azimuth_widths[azimuth_index[azimuth]] * zenith_weights[zenith_index[zenith]]
+    return solid_angles
+
+
+def top90_energy_region(energy, solid_angles, fraction=0.90):
+    selected = np.zeros(energy.size, dtype=bool)
+    total = float(np.sum(energy))
+    if total <= 0.0 or energy.size == 0:
+        return selected, 0.0, 0.0, 0.0, 0
+
+    order = np.argsort(-energy, kind="stable")
+    cumulative = np.cumsum(energy[order])
+    index = int(np.searchsorted(cumulative, fraction * total, side="left"))
+    index = min(index, order.size - 1)
+    selected[order[: index + 1]] = True
+
+    solid_angle = float(np.sum(solid_angles[selected]))
+    hemisphere_fraction = solid_angle / (2.0 * math.pi)
+    return selected, solid_angle, hemisphere_fraction, 100.0 * hemisphere_fraction, int(np.count_nonzero(selected))
+
+
+def analyze_radius(radius, path):
+    data = read_daily_csv(path)
+    energy = data["energy_Wh_m2"]
+    if energy.size == 0:
+        raise ValueError(f"Daily energy CSV contains no sky bins: {path}")
+
+    vectors = unit_vectors(data["azimuth_center_deg"], data["elevation_center_deg"])
+    total_energy = float(np.sum(energy))
+    solid_angles = bin_solid_angles(data)
+    top90_mask, top90_solid_angle, top90_fraction, top90_percent, top90_bin_count = top90_energy_region(
+        energy,
+        solid_angles,
+    )
+
+    max_index = int(np.argmax(energy))
+    az_max = float(data["azimuth_center_deg"][max_index])
+    el_max = float(data["elevation_center_deg"][max_index])
+    max_energy = float(energy[max_index])
+
+    weighted_vector = np.sum(vectors * energy[:, np.newaxis], axis=0)
+    centroid_norm = np.linalg.norm(weighted_vector)
+    if total_energy > 0.0 and centroid_norm > 0.0 and np.isfinite(centroid_norm):
+        centroid_vector = weighted_vector / centroid_norm
+        az_centroid, el_centroid = vector_to_azimuth_elevation(centroid_vector)
+    else:
+        az_centroid = math.nan
+        el_centroid = math.nan
+
+    return {
+        "radius": radius,
+        "path": path,
+        "data": data,
+        "vectors": vectors,
+        "Top90EnergyRegion": top90_mask,
+        "Az_max_deg": az_max,
+        "El_max_deg": el_max,
+        "MaxEnergy_Wh_m2": max_energy,
+        "Az_centroid_deg": az_centroid,
+        "El_centroid_deg": el_centroid,
+        "TotalEnergy_Wh_m2": total_energy,
+        "Top90SolidAngle_sr": top90_solid_angle,
+        "Top90HemisphereFraction": top90_fraction,
+        "Top90HemispherePercent": top90_percent,
+        "Top90BinCount": top90_bin_count,
+        "TotalBinCount": int(energy.size),
+    }
+
+
+def write_summary_csv(path, results):
+    with path.open("w", newline="", encoding="utf-8") as file:
+        writer = csv.writer(file)
+        writer.writerow([
+            "Radius_m",
+            "Az_max_deg",
+            "El_max_deg",
+            "MaxEnergy_Wh_m2",
+            "Az_centroid_deg",
+            "El_centroid_deg",
+            "TotalEnergy_Wh_m2",
+            "Top90SolidAngle_sr",
+            "Top90HemisphereFraction",
+            "Top90HemispherePercent",
+            "Top90BinCount",
+            "TotalBinCount",
+        ])
+        for result in results:
+            writer.writerow([
+                f"{result['radius']:.10g}",
+                f"{result['Az_max_deg']:.10g}",
+                f"{result['El_max_deg']:.10g}",
+                f"{result['MaxEnergy_Wh_m2']:.17g}",
+                f"{result['Az_centroid_deg']:.10g}",
+                f"{result['El_centroid_deg']:.10g}",
+                f"{result['TotalEnergy_Wh_m2']:.17g}",
+                f"{result['Top90SolidAngle_sr']:.17g}",
+                f"{result['Top90HemisphereFraction']:.17g}",
+                f"{result['Top90HemispherePercent']:.10g}",
+                result["Top90BinCount"],
+                result["TotalBinCount"],
+            ])
+
+
+def grid_from_flat(data, values=None):
+    azimuth_centers = np.unique(data["azimuth_center_deg"])
+    zenith_centers = np.unique(data["zenith_center_deg"])
+    if values is None:
+        values = data["energy_Wh_m2"]
+    grid = np.full((azimuth_centers.size, zenith_centers.size), np.nan, dtype=np.float64)
     azimuth_index = {value: index for index, value in enumerate(azimuth_centers)}
     zenith_index = {value: index for index, value in enumerate(zenith_centers)}
     for azimuth, zenith, value in zip(
         data["azimuth_center_deg"],
         data["zenith_center_deg"],
-        data["energy_Wh_m2"],
+        values,
     ):
-        energy[azimuth_index[azimuth], zenith_index[zenith]] = value
-    if np.any(~np.isfinite(energy)):
+        grid[azimuth_index[azimuth], zenith_index[zenith]] = value
+    if np.any(~np.isfinite(grid)):
         raise ValueError("Daily energy grid is incomplete.")
-    return azimuth_centers, zenith_centers, energy
+    return azimuth_centers, zenith_centers, grid
 
 
 def choose_norm(values, mpl_colors):
@@ -242,45 +291,6 @@ def contour_levels(values):
         return []
     levels = [max_value * fraction for fraction in (0.10, 0.25, 0.50, 0.75, 0.90)]
     return [level for level in levels if min_value < level < max_value]
-
-
-def great_circle_boundary(center_vector, theta_deg, samples=361):
-    if not np.isfinite(theta_deg):
-        return np.array([]), np.array([])
-
-    center = np.asarray(center_vector, dtype=np.float64)
-    norm = np.linalg.norm(center)
-    if norm <= 0.0 or not np.isfinite(norm):
-        return np.array([]), np.array([])
-    center = center / norm
-
-    reference = np.array([0.0, 0.0, 1.0])
-    if abs(float(center @ reference)) > 0.95:
-        reference = np.array([1.0, 0.0, 0.0])
-    axis_a = np.cross(center, reference)
-    axis_a = axis_a / np.linalg.norm(axis_a)
-    axis_b = np.cross(center, axis_a)
-
-    theta = math.radians(theta_deg)
-    phi = np.linspace(0.0, 2.0 * math.pi, samples)
-    vectors = (
-        math.cos(theta) * center
-        + math.sin(theta) * (np.cos(phi)[:, np.newaxis] * axis_a + np.sin(phi)[:, np.newaxis] * axis_b)
-    )
-
-    azimuth = (np.degrees(np.arctan2(vectors[:, 0], vectors[:, 1])) + 360.0) % 360.0
-    elevation = np.degrees(np.arcsin(np.clip(vectors[:, 2], -1.0, 1.0)))
-    zenith = 90.0 - elevation
-    visible = (elevation >= 0.0) & (zenith >= 0.0) & (zenith <= 90.0)
-    azimuth[~visible] = np.nan
-    zenith[~visible] = np.nan
-
-    theta_plot = np.radians(azimuth)
-    jumps = np.abs(np.diff(theta_plot)) > math.pi
-    jump_indices = np.flatnonzero(jumps) + 1
-    theta_plot[jump_indices] = np.nan
-    zenith[jump_indices] = np.nan
-    return theta_plot, zenith
 
 
 def plot_marker(ax, azimuth_deg, elevation_deg, *, marker, color, label, zorder):
@@ -302,9 +312,15 @@ def plot_marker(ax, azimuth_deg, elevation_deg, *, marker, color, label, zorder)
 def write_overlay_plot(path, result):
     mpl_colors, plt = require_matplotlib()
     azimuth_centers, zenith_centers, energy = grid_from_flat(result["data"])
-    azimuth_edges = center_edges(azimuth_centers, 0.0, 360.0)
+    _, _, top90_grid = grid_from_flat(result["data"], result["Top90EnergyRegion"].astype(np.float64))
+    azimuth_edges = periodic_azimuth_edges(azimuth_centers)
     zenith_edges = center_edges(zenith_centers, 0.0, 90.0)
     zenith_edge_grid, theta_edge_grid = np.meshgrid(zenith_edges, np.radians(azimuth_edges), indexing="ij")
+    zenith_center_grid, theta_center_grid = np.meshgrid(
+        zenith_centers,
+        np.radians(azimuth_centers),
+        indexing="ij",
+    )
 
     fig, ax = plt.subplots(figsize=(10, 9), subplot_kw={"projection": "polar"}, constrained_layout=True)
     ax.set_theta_zero_location("N")
@@ -336,27 +352,40 @@ def write_overlay_plot(path, result):
 
     levels = contour_levels(energy)
     if levels:
-        zenith_center_grid, theta_center_grid = np.meshgrid(zenith_centers, np.radians(azimuth_centers), indexing="ij")
         ax.contour(theta_center_grid, zenith_center_grid, energy.T, levels=levels, colors="white", linewidths=0.6, alpha=0.55)
+
+    if np.any(top90_grid):
+        top90_overlay = np.where(top90_grid.T > 0.5, 1.0, np.nan)
+        top90_cmap = mpl_colors.ListedColormap(["#00d5ff"])
+        ax.pcolormesh(
+            theta_edge_grid,
+            zenith_edge_grid,
+            top90_overlay,
+            cmap=top90_cmap,
+            shading="auto",
+            alpha=0.28,
+            zorder=5,
+        )
+        if np.any(top90_grid < 0.5):
+            ax.contour(
+                theta_center_grid,
+                zenith_center_grid,
+                top90_grid.T,
+                levels=[0.5],
+                colors="#00d5ff",
+                linewidths=1.2,
+                alpha=0.9,
+                zorder=6,
+            )
+        ax.plot([], [], color="#00d5ff", linewidth=5, alpha=0.45, label="Top90EnergyRegion")
 
     plot_marker(ax, result["Az_max_deg"], result["El_max_deg"], marker="o", color="white", label="Hotspot", zorder=7)
     plot_marker(ax, result["Az_centroid_deg"], result["El_centroid_deg"], marker="D", color="cyan", label="Centroid", zorder=8)
 
-    theta, zenith = great_circle_boundary(result["max_vector"], result["Theta90_max_deg"])
-    if theta.size:
-        ax.plot(theta, zenith, color="white", linewidth=1.4, linestyle="-", label="Theta90 hotspot", zorder=6)
-
-    theta, zenith = great_circle_boundary(result["centroid_vector"], result["Theta90_centroid_deg"])
-    if theta.size:
-        ax.plot(theta, zenith, color="cyan", linewidth=1.4, linestyle="--", label="Theta90 centroid", zorder=6)
-
     ax.set_title(
         "\n".join((
             f"Daily energy concentration, R = {result['radius']:g} m",
-            (
-                f"Theta90 hotspot = {result['Theta90_max_deg']:.2f}\N{DEGREE SIGN}; "
-                f"Theta90 centroid = {result['Theta90_centroid_deg']:.2f}\N{DEGREE SIGN}"
-            ),
+            f"Top90 region = {result['Top90SolidAngle_sr']:.4g} sr ({result['Top90HemispherePercent']:.2f}% hemisphere)",
         )),
         fontsize=12,
         pad=20,
@@ -369,36 +398,44 @@ def write_overlay_plot(path, result):
 def write_summary_plot(path, results):
     _, plt = require_matplotlib()
     radii = np.array([result["radius"] for result in results], dtype=np.float64)
-    theta_max = np.array([result["Theta90_max_deg"] for result in results], dtype=np.float64)
-    theta_centroid = np.array([result["Theta90_centroid_deg"] for result in results], dtype=np.float64)
+    solid_angles = np.array([result["Top90SolidAngle_sr"] for result in results], dtype=np.float64)
 
     fig, ax = plt.subplots(figsize=(8, 5), constrained_layout=True)
-    ax.plot(radii, theta_max, marker="o", label="Theta90 hotspot")
-    ax.plot(radii, theta_centroid, marker="s", label="Theta90 centroid")
+    ax.plot(radii, solid_angles, marker="o", label="Energy-ranked 90% region")
     ax.set_xlabel("Radius [m]")
-    ax.set_ylabel("Angular radius [deg]")
-    ax.set_title("Daily escaped-energy angular concentration")
+    ax.set_ylabel("Top90 solid angle [sr]")
+    ax.set_title("Daily escaped-energy 90% sky-region size")
     ax.grid(True, alpha=0.35)
     ax.legend()
+    secondary = ax.secondary_yaxis(
+        "right",
+        functions=(
+            lambda steradians: steradians / (2.0 * math.pi) * 100.0,
+            lambda percent: percent / 100.0 * (2.0 * math.pi),
+        ),
+    )
+    secondary.set_ylabel("Hemisphere fraction [%]")
     fig.savefig(path, dpi=180)
     plt.close(fig)
 
 
 def print_summary(results):
-    print("Radius  Theta90_max  Theta90_centroid")
+    print("Radius  Top90SolidAngle_sr  Top90HemispherePercent  Top90BinCount  MaxEnergy_Wh_m2")
     for result in results:
         print(
             f"{result['radius']:g}  "
-            f"{result['Theta90_max_deg']:.6g}  "
-            f"{result['Theta90_centroid_deg']:.6g}"
+            f"{result['Top90SolidAngle_sr']:.6g}  "
+            f"{result['Top90HemispherePercent']:.6g}  "
+            f"{result['Top90BinCount']}  "
+            f"{result['MaxEnergy_Wh_m2']:.6g}"
         )
 
-    theta_max = np.array([result["Theta90_max_deg"] for result in results], dtype=np.float64)
-    theta_centroid = np.array([result["Theta90_centroid_deg"] for result in results], dtype=np.float64)
-    print(f"Minimum Theta90_max {np.nanmin(theta_max):.6g}")
-    print(f"Maximum Theta90_max {np.nanmax(theta_max):.6g}")
-    print(f"Minimum Theta90_centroid {np.nanmin(theta_centroid):.6g}")
-    print(f"Maximum Theta90_centroid {np.nanmax(theta_centroid):.6g}")
+    solid_angles = np.array([result["Top90SolidAngle_sr"] for result in results], dtype=np.float64)
+    percentages = np.array([result["Top90HemispherePercent"] for result in results], dtype=np.float64)
+    print(f"Minimum Top90SolidAngle_sr {np.nanmin(solid_angles):.6g}")
+    print(f"Maximum Top90SolidAngle_sr {np.nanmax(solid_angles):.6g}")
+    print(f"Minimum Top90HemispherePercent {np.nanmin(percentages):.6g}")
+    print(f"Maximum Top90HemispherePercent {np.nanmax(percentages):.6g}")
 
 
 def parse_args():
