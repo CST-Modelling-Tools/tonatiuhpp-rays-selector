@@ -32,12 +32,68 @@ SUMMARY_COLUMNS = (
     "MaxFlux_W_m2",
     "Az_max_flux_deg",
     "El_max_flux_deg",
+    "SunAzimuth_deg",
+    "SunElevation_deg",
+    "DNI_W_m2",
     "OutputPng",
+)
+
+SUN_REQUIRED_COLUMNS = (
+    "point_name",
+    "sun_azimuth_deg",
+    "sun_elevation_deg",
 )
 
 
 def top_region_label(fraction):
     return f"Top{100.0 * fraction:g}"
+
+
+def parse_optional_float(value, path, row_number, column):
+    if value is None or value.strip() == "":
+        return None
+    try:
+        parsed = float(value)
+    except ValueError as exc:
+        raise ValueError(f"Invalid numeric value in {path}, row {row_number}, column {column}") from exc
+    if not math.isfinite(parsed):
+        raise ValueError(f"CSV file contains non-finite value in column {column}: {path}")
+    return parsed
+
+
+def read_sun_positions_csv(path):
+    with path.open(newline="", encoding="utf-8-sig") as file:
+        reader = csv.DictReader(file)
+        if reader.fieldnames is None:
+            raise ValueError(f"CSV file has no header: {path}")
+
+        missing = [column for column in SUN_REQUIRED_COLUMNS if column not in reader.fieldnames]
+        if missing:
+            raise ValueError(f"CSV file is missing required column(s) {missing}: {path}")
+
+        sun_positions = {}
+        for row_number, row in enumerate(reader, start=2):
+            point_name = row["point_name"].strip()
+            if not point_name:
+                raise ValueError(f"Missing point_name in {path}, row {row_number}")
+            if point_name in sun_positions:
+                raise ValueError(f"Duplicate point_name in {path}: {point_name}")
+
+            sun_azimuth = parse_optional_float(row["sun_azimuth_deg"], path, row_number, "sun_azimuth_deg")
+            sun_elevation = parse_optional_float(row["sun_elevation_deg"], path, row_number, "sun_elevation_deg")
+            dni = parse_optional_float(row.get("dni_W_m2"), path, row_number, "dni_W_m2")
+            if sun_azimuth is None or sun_elevation is None:
+                raise ValueError(f"Missing Sun azimuth/elevation in {path}, row {row_number}")
+            if dni is not None and dni < 0.0:
+                raise ValueError(f"CSV file contains negative DNI in {path}, row {row_number}")
+
+            sun_positions[point_name] = {
+                "SunAzimuth_deg": sun_azimuth,
+                "SunElevation_deg": sun_elevation,
+                "DNI_W_m2": dni,
+            }
+
+    return sun_positions
 
 
 def top_power_region_mask(power, solid_angles, fraction):
@@ -117,9 +173,30 @@ def analyze_flux_file(input_folder, hour, radius, path, top_fraction):
         "MaxFlux_W_m2": float(data["flux_W_m2"][max_flux_index]),
         "Az_max_flux_deg": float(data["azimuth_center_deg"][max_flux_index]),
         "El_max_flux_deg": float(data["elevation_center_deg"][max_flux_index]),
+        "SunAzimuth_deg": None,
+        "SunElevation_deg": None,
+        "DNI_W_m2": None,
         "OutputPng": "",
     }
     return result, data, top_mask
+
+
+def apply_sun_position(result, sun_positions, warned_missing_points):
+    if sun_positions is None:
+        return
+
+    sun_position = sun_positions.get(result["point_name"])
+    if sun_position is None:
+        if result["point_name"] not in warned_missing_points:
+            print(f"Warning: no Sun position row found for {result['point_name']}")
+            warned_missing_points.add(result["point_name"])
+        return
+
+    result.update(sun_position)
+
+
+def has_sun_position(result):
+    return result["SunAzimuth_deg"] is not None and result["SunElevation_deg"] is not None
 
 
 def output_png_name(result):
@@ -130,15 +207,23 @@ def output_png_name(result):
 
 
 def annotate_summary(ax, result, label):
-    text = "\n".join((
-        f"{label} solid angle = {result['Top90SolidAngle_sr']:.4g} sr",
+    lines = [
+        f"{label} solid angle = {result['Top90SolidAngle_sr']:.3f} sr",
         f"{label} hemisphere = {result['Top90HemispherePercent']:.2f}%",
-        f"Max flux = {result['MaxFlux_W_m2']:.4g} W/m$^2$",
-        (
-            f"Max at az = {result['Az_max_flux_deg']:.1f}\N{DEGREE SIGN}, "
-            f"el = {result['El_max_flux_deg']:.1f}\N{DEGREE SIGN}"
-        ),
-    ))
+        f"Max flux = {result['MaxFlux_W_m2']:.2f} W/m$^2$",
+        f"Max at az = {result['Az_max_flux_deg']:.2f}\N{DEGREE SIGN}, el = {result['El_max_flux_deg']:.2f}\N{DEGREE SIGN}",
+    ]
+    if has_sun_position(result):
+        lines.append(
+            f"Sun az = {result['SunAzimuth_deg']:.2f}\N{DEGREE SIGN}, "
+            f"el = {result['SunElevation_deg']:.2f}\N{DEGREE SIGN}"
+        )
+        if result["DNI_W_m2"] is not None:
+            lines.append(f"DNI = {result['DNI_W_m2']:.2f} W/m$^2$")
+        else:
+            lines.append("DNI =")
+
+    text = "\n".join(lines)
     ax.text(
         0.02,
         0.02,
@@ -217,10 +302,10 @@ def write_concentration_plot(path, day_name, result, data, top_mask, top_fractio
             edgecolors="black",
             linewidths=0.9,
             label="Maximum flux",
-            zorder=7,
+            zorder=9,
         )
         ax.annotate(
-            f"{result['MaxFlux_W_m2']:.4g} W/m$^2$",
+            f"{result['MaxFlux_W_m2']:.2f} W/m$^2$",
             xy=(max_theta, max_zenith),
             xytext=(18, 18),
             textcoords="offset points",
@@ -228,17 +313,44 @@ def write_concentration_plot(path, day_name, result, data, top_mask, top_fractio
             color="black",
             bbox={"facecolor": "white", "edgecolor": "#555555", "alpha": 0.88, "pad": 3.0},
             arrowprops={"arrowstyle": "->", "color": "#333333", "linewidth": 0.9},
-            zorder=8,
+            zorder=11,
         )
+
+    if has_sun_position(result):
+        sun_zenith = 90.0 - result["SunElevation_deg"]
+        if 0.0 <= sun_zenith <= 90.0:
+            sun_theta = math.radians(result["SunAzimuth_deg"])
+            ax.scatter(
+                sun_theta,
+                sun_zenith,
+                marker="o",
+                s=190,
+                c="yellow",
+                edgecolors="black",
+                linewidths=1.0,
+                label="Sun",
+                zorder=8,
+            )
+            ax.annotate(
+                "Sun",
+                xy=(sun_theta, sun_zenith),
+                xytext=(10, 10),
+                textcoords="offset points",
+                fontsize=10,
+                weight="bold",
+                color="black",
+                bbox={"facecolor": "white", "edgecolor": "none", "alpha": 0.75, "pad": 1.5},
+                zorder=10,
+            )
 
     annotate_summary(ax, result, label)
     ax.set_title(
         "\n".join((
             f"{day_name} flux concentration, {result['time_label']}, R = {result['Radius_m']:g} m",
             (
-                f"{label} = {result['Top90SolidAngle_sr']:.4g} sr "
+                f"{label} = {result['Top90SolidAngle_sr']:.3f} sr "
                 f"({result['Top90HemispherePercent']:.2f}% hemisphere); "
-                f"max flux = {result['MaxFlux_W_m2']:.4g} W/m$^2$"
+                f"max flux = {result['MaxFlux_W_m2']:.2f} W/m$^2$"
             ),
         )),
         fontsize=12,
@@ -266,9 +378,12 @@ def write_summary_csv(path, results):
                 f"{result['Top90HemispherePercent']:.10g}",
                 result["Top90BinCount"],
                 result["TotalBinCount"],
-                f"{result['MaxFlux_W_m2']:.17g}",
+                f"{result['MaxFlux_W_m2']:.2f}",
                 f"{result['Az_max_flux_deg']:.10g}",
                 f"{result['El_max_flux_deg']:.10g}",
+                "" if result["SunAzimuth_deg"] is None else f"{result['SunAzimuth_deg']:.10g}",
+                "" if result["SunElevation_deg"] is None else f"{result['SunElevation_deg']:.10g}",
+                "" if result["DNI_W_m2"] is None else f"{result['DNI_W_m2']:.10g}",
                 result["OutputPng"],
             ])
 
@@ -289,6 +404,7 @@ def parse_args():
     parser.add_argument("--top-fraction", type=float, default=0.90)
     parser.add_argument("--dpi", type=int, default=180)
     parser.add_argument("--show-empty", action="store_true", help="Write annotated plots for zero-power CSV files.")
+    parser.add_argument("--sun-positions-csv", default=None, help="Day-level CSV mapping Point_<n> folders to Sun position.")
     return parser.parse_args()
 
 
@@ -308,6 +424,13 @@ def main():
     output_dir = input_folder / "hourly_flux_concentration_maps" if args.output_dir is None else Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    sun_positions = None
+    if args.sun_positions_csv is not None:
+        sun_positions_path = Path(args.sun_positions_csv)
+        if not sun_positions_path.is_file():
+            raise ValueError(f"Sun positions CSV does not exist or is not a file: {sun_positions_path}")
+        sun_positions = read_sun_positions_csv(sun_positions_path)
+
     discovered = discover_flux_files(input_folder, args.radii, args.point_hour_offset)
     if not discovered:
         raise ValueError(f"No requested hemisphere_flux_R<m>m.csv files found under: {input_folder}")
@@ -318,8 +441,10 @@ def main():
 
     results = []
     written_count = 0
+    warned_missing_sun_points = set()
     for hour, radius, csv_path in discovered:
         result, data, top_mask = analyze_flux_file(input_folder, hour, radius, csv_path, args.top_fraction)
+        apply_sun_position(result, sun_positions, warned_missing_sun_points)
         if result["TotalPower_W"] > 0.0 or args.show_empty:
             png_path = output_dir / output_png_name(result)
             write_concentration_plot(png_path, input_folder.name, result, data, top_mask, args.top_fraction, args.dpi)

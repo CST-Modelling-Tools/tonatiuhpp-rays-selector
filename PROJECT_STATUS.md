@@ -92,7 +92,7 @@ The companion `<output_prefix>_parameters.txt` file records the field list plus 
 * `tools/aggregate_daily_hemisphere_energy.py` aggregates hourly hemisphere flux CSV files into daily sky-dome energy PNG and CSV outputs.
 * `tools/analyze_daily_energy_concentration.py` computes energy-ranked 90% daily concentration regions, solid-angle summaries, and per-radius irregular-region overlays.
 * `tools/analyze_hourly_flux_concentration.py` analyzes hourly hemisphere flux CSV files under `Point_<n>` folders and writes time-evolution CSV and PNG summaries of power-ranked 90% concentration solid angle plus maximum-flux bubble markers.
-* `tools/plot_hourly_flux_concentration_maps.py` writes per-hour, per-radius polar sky-dome PNG maps showing the power-ranked Top90 region and maximum-flux bin from hourly hemisphere flux CSV files.
+* `tools/plot_hourly_flux_concentration_maps.py` writes per-hour, per-radius polar sky-dome PNG maps showing the power-ranked Top90 region, maximum-flux bin, and optional day-level Sun position/DNI overlays from hourly hemisphere flux CSV files.
 
 ## Current Output Format
 
@@ -148,7 +148,7 @@ Contains:
 * Daily energy concentration analysis utility added and synthetically validated with a dominant-lobe dataset.
 * Daily energy concentration analysis now reports energy-ranked 90% sky regions using physical solid angle instead of symmetric circular containment regions, with single-lobe and disconnected two-lobe synthetic validation completed.
 * Hourly flux concentration analysis utility added and synthetically validated with Point_10/Point_21 time mapping and power-ranked 90% selection across two radii.
-* Hourly flux concentration map plotting utility added and synthetically validated with Point_10/Point_21 time mapping, two radii, power-ranked Top90 region selection, and flux-ranked maximum-bin annotation.
+* Hourly flux concentration map plotting utility added and synthetically validated with Point_10/Point_21 time mapping, two radii, power-ranked Top90 region selection, flux-ranked maximum-bin annotation, optional Sun position/DNI overlays, and missing-Sun-row handling.
 
 ## Known Technical Debt
 
