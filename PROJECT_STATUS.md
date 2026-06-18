@@ -2,7 +2,7 @@
 
 ## Last updated
 
-2026-06-03
+2026-06-18
 
 ## Purpose
 
@@ -91,6 +91,7 @@ The companion `<output_prefix>_parameters.txt` file records the field list plus 
 * `tools/map_escaped_flux_hemisphere.py` maps compact escaped-ray records onto sky-dome hemispheres and writes report-oriented polar flux PNG and CSV outputs for one or more radii.
 * `tools/aggregate_daily_hemisphere_energy.py` aggregates hourly hemisphere flux CSV files into daily sky-dome energy PNG and CSV outputs.
 * `tools/analyze_daily_energy_concentration.py` computes energy-ranked 90% daily concentration regions, solid-angle summaries, and per-radius irregular-region overlays.
+* `tools/analyze_hourly_flux_concentration.py` analyzes hourly hemisphere flux CSV files under `Point_<n>` folders and writes time-evolution CSV and PNG summaries of power-ranked 90% concentration solid angle plus maximum-flux bubble markers.
 
 ## Current Output Format
 
@@ -145,6 +146,7 @@ Contains:
 * Daily hemisphere energy aggregation now accepts prefixed hourly flux CSV filenames.
 * Daily energy concentration analysis utility added and synthetically validated with a dominant-lobe dataset.
 * Daily energy concentration analysis now reports energy-ranked 90% sky regions using physical solid angle instead of symmetric circular containment regions, with single-lobe and disconnected two-lobe synthetic validation completed.
+* Hourly flux concentration analysis utility added and synthetically validated with Point_10/Point_21 time mapping and power-ranked 90% selection across two radii.
 
 ## Known Technical Debt
 
@@ -159,6 +161,7 @@ Contains:
 * Verify power accounting.
 * Validate performance on multi-million-ray datasets.
 * Validate hemisphere flux maps on representative real escaped-ray datasets.
+* Validate hourly flux concentration summaries on representative real Spring Equinox escaped-ray datasets.
 
 ## Recommended Next Milestones
 
