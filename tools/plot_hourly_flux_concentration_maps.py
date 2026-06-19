@@ -19,9 +19,12 @@ from analyze_hourly_flux_concentration import (
 from map_escaped_flux_hemisphere import azimuth_grid_labels, degree_label, require_matplotlib
 
 
+TIME_BASIS = "Local Solar Time"
+
 SUMMARY_COLUMNS = (
     "time_label",
     "hour",
+    "TimeBasis",
     "point_name",
     "Radius_m",
     "TotalPower_W",
@@ -163,6 +166,7 @@ def analyze_flux_file(input_folder, hour, radius, path, top_fraction):
     result = {
         "time_label": time_label(hour),
         "hour": hour,
+        "TimeBasis": TIME_BASIS,
         "point_name": f"Point_{point_number}",
         "Radius_m": radius,
         "TotalPower_W": float(np.sum(data["power_W"])),
@@ -208,6 +212,7 @@ def output_png_name(result):
 
 def annotate_summary(ax, result, label):
     lines = [
+        f"Time = {result['time_label']} ({result['TimeBasis']})",
         f"{label} solid angle = {result['Top90SolidAngle_sr']:.3f} sr",
         f"{label} hemisphere = {result['Top90HemispherePercent']:.2f}%",
         f"Max flux = {result['MaxFlux_W_m2']:.2f} W/m$^2$",
@@ -346,7 +351,7 @@ def write_concentration_plot(path, day_name, result, data, top_mask, top_fractio
     annotate_summary(ax, result, label)
     ax.set_title(
         "\n".join((
-            f"{day_name} flux concentration, {result['time_label']}, R = {result['Radius_m']:g} m",
+            f"{day_name} flux concentration, {result['TimeBasis']} {result['time_label']}, R = {result['Radius_m']:g} m",
             (
                 f"{label} = {result['Top90SolidAngle_sr']:.3f} sr "
                 f"({result['Top90HemispherePercent']:.2f}% hemisphere); "
@@ -371,6 +376,7 @@ def write_summary_csv(path, results):
             writer.writerow([
                 result["time_label"],
                 result["hour"],
+                result["TimeBasis"],
                 result["point_name"],
                 f"{result['Radius_m']:.10g}",
                 f"{result['TotalPower_W']:.17g}",
@@ -398,7 +404,7 @@ def parse_args():
         "--point-hour-offset",
         type=int,
         default=-3,
-        help="Offset added to Point_<n> folder numbers to infer hour of day.",
+        help="Offset added to Point_<n> folder numbers to infer local solar hour.",
     )
     parser.add_argument("--output-dir", default=None)
     parser.add_argument("--top-fraction", type=float, default=0.90)
@@ -462,6 +468,7 @@ def main():
     print(f"Processed {len(results)} hour/radius combinations.")
     print(f"Wrote {written_count} PNG map(s); skipped {skipped_count} zero-power map(s).")
     print(f"Wrote {summary_csv}")
+    print(f"Time basis: {TIME_BASIS}")
 
 
 if __name__ == "__main__":
