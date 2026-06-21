@@ -30,7 +30,7 @@ SUMMARY_COLUMNS = (
     "El_max_flux_deg",
 )
 
-DEFAULT_RADII = (300.0, 400.0, 500.0, 1000.0)
+DEFAULT_RADII = (25.0, 50.0, 100.0, 200.0, 300.0, 400.0, 500.0, 1000.0)
 FLUX_FILE_RE = re.compile(r"^hemisphere_flux_R(?P<label>.+)m\.csv$")
 POINT_FOLDER_RE = re.compile(r"^Point_(?P<number>\d+)$")
 
