@@ -261,22 +261,22 @@ def write_line_plot(path, cases, radius, column, ylabel, title, ymax, ticks, tic
     plt.close(fig)
 
 
-def write_plots(output_dir, cases, radii, top90_ymax, flux_ymax, title_prefix, dpi):
+def write_plots(output_dir, cases, radii, top90_percent_ymax, flux_ymax, title_prefix, dpi):
     ticks, tick_labels = time_ticks(cases, radii)
     written = []
     for radius in radii:
         label = radius_label(radius)
-        top90_path = output_dir / f"comparison_top90_solid_angle_R{label}m.png"
+        top90_path = output_dir / f"comparison_top90_hemisphere_percent_R{label}m.png"
         flux_path = output_dir / f"comparison_max_flux_R{label}m.png"
 
         write_line_plot(
             top90_path,
             cases,
             radius,
-            "Top90SolidAngle_sr",
-            "Top90 solid angle [sr]",
-            f"{title_prefix} hourly Top90 solid angle, R = {radius:g} m",
-            top90_ymax,
+            "Top90HemispherePercent",
+            "Top90 hemisphere percentage [%]",
+            f"{title_prefix} hourly Top90 hemisphere percentage, R = {radius:g} m",
+            top90_percent_ymax,
             ticks,
             tick_labels,
             dpi,
@@ -309,7 +309,14 @@ def parse_args():
     )
     parser.add_argument("--radii", nargs="+", type=float, default=None, help="Radii in meters to compare.")
     parser.add_argument("--output-dir", default=".", help="Folder for comparison CSV and PNG outputs.")
-    parser.add_argument("--top90-ymax", type=float, default=None, help="Override Top90 plot y-axis maximum.")
+    parser.add_argument(
+        "--top90-percent-ymax",
+        "--top90-ymax",
+        dest="top90_percent_ymax",
+        type=float,
+        default=None,
+        help="Override Top90 hemisphere-percentage plot y-axis maximum. --top90-ymax is a compatibility alias.",
+    )
     parser.add_argument("--flux-ymax", type=float, default=None, help="Override maximum-flux plot y-axis maximum.")
     parser.add_argument("--title-prefix", default="Spring Equinox")
     parser.add_argument("--dpi", type=int, default=180)
@@ -322,8 +329,8 @@ def main():
         raise ValueError("At least two --case arguments are required for comparison.")
     if args.dpi <= 0:
         raise ValueError("--dpi must be positive")
-    if args.top90_ymax is not None and args.top90_ymax <= 0.0:
-        raise ValueError("--top90-ymax must be positive")
+    if args.top90_percent_ymax is not None and args.top90_percent_ymax <= 0.0:
+        raise ValueError("--top90-percent-ymax/--top90-ymax must be positive")
     if args.flux_ymax is not None and args.flux_ymax <= 0.0:
         raise ValueError("--flux-ymax must be positive")
 
@@ -336,7 +343,11 @@ def main():
     cases = [read_case(label, path) for label, path in parsed_cases]
     radii = select_radii(cases, args.radii)
 
-    top90_ymax = args.top90_ymax if args.top90_ymax is not None else global_max(cases, radii, "Top90SolidAngle_sr")
+    top90_percent_ymax = (
+        args.top90_percent_ymax
+        if args.top90_percent_ymax is not None
+        else global_max(cases, radii, "Top90HemispherePercent")
+    )
     flux_ymax = args.flux_ymax if args.flux_ymax is not None else global_max(cases, radii, "MaxFlux_W_m2")
 
     output_dir = Path(args.output_dir)
@@ -344,10 +355,10 @@ def main():
 
     comparison_csv = output_dir / "hourly_flux_concentration_comparison.csv"
     write_comparison_csv(comparison_csv, cases)
-    written_plots = write_plots(output_dir, cases, radii, top90_ymax, flux_ymax, args.title_prefix, args.dpi)
+    written_plots = write_plots(output_dir, cases, radii, top90_percent_ymax, flux_ymax, args.title_prefix, args.dpi)
 
     print(f"Compared {len(cases)} technology cases at radii: {', '.join(f'{radius:g}' for radius in radii)} m")
-    print(f"Top90 y-axis maximum: {top90_ymax:.10g} sr")
+    print(f"Top90 hemisphere-percentage y-axis maximum: {top90_percent_ymax:.10g} %")
     print(f"Maximum-flux y-axis maximum: {flux_ymax:.10g} W/m^2")
     print(f"Wrote {comparison_csv}")
     for path in written_plots:
