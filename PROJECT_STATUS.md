@@ -2,7 +2,7 @@
 
 ## Last updated
 
-2026-06-22
+2026-06-23
 
 ## Purpose
 
@@ -94,6 +94,8 @@ The companion `<output_prefix>_parameters.txt` file records the field list plus 
 * `tools/analyze_hourly_flux_concentration.py` analyzes hourly hemisphere flux CSV files under `Point_<n>` folders and writes time-evolution CSV and PNG summaries of power-ranked 90% concentration solid angle plus maximum-flux bubble markers.
 * `tools/plot_hourly_flux_concentration_maps.py` writes per-hour, per-radius polar sky-dome PNG maps showing the power-ranked Top90 region, maximum-flux bin, and optional day-level Sun position/DNI overlays from hourly hemisphere flux CSV files.
 * `tools/compare_hourly_flux_concentration.py` compares hourly flux-concentration CSV outputs across technology cases with separate Top90 hemisphere-percentage and maximum-flux line plots per radius.
+* `tools/compare_hourly_max_flux_bubbles.py` compares hourly maximum-flux curves across technology cases with Top90 hemisphere-percentage encoded as fixed-scale bubble radius.
+* `tools/plot_max_flux_vs_radius.py` plots maximum escaped flux versus hemisphere radius for each technology case, with separate curves for solar hours.
 
 ## Current Output Format
 
@@ -151,6 +153,8 @@ Contains:
 * Hourly flux concentration analysis utility added and synthetically validated with Point_10/Point_21 time mapping and power-ranked 90% selection across two radii.
 * Hourly flux concentration map plotting utility added and synthetically validated with Point_10/Point_21 time mapping, two radii, power-ranked Top90 region selection, flux-ranked maximum-bin annotation, optional Sun position/DNI overlays, and missing-Sun-row handling.
 * Hourly flux concentration comparison utility added and synthetically validated with two technology cases, requested and intersected radius selection, Top90 hemisphere-percentage plots, global y-axis scaling, combined CSV output, and missing-radius error reporting.
+* Hourly maximum-flux bubble comparison utility added with fixed 0-4% Top90 hemisphere-percentage bubble-radius scaling.
+* Hourly maximum-flux radius-dependence plotting utility added for per-technology distance analysis across solar hours.
 
 ## Known Technical Debt
 
@@ -167,6 +171,8 @@ Contains:
 * Validate hemisphere flux maps on representative real escaped-ray datasets.
 * Validate hourly flux concentration summaries and maps on representative real Spring Equinox escaped-ray datasets.
 * Validate hourly flux concentration technology comparisons on representative real Spring Equinox case outputs.
+* Validate hourly maximum-flux bubble comparisons on representative real Spring Equinox technology outputs.
+* Validate maximum-flux radius-dependence plots on representative real Spring Equinox technology outputs.
 
 ## Recommended Next Milestones
 
