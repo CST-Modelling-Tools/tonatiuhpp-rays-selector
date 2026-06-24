@@ -156,7 +156,7 @@ Contains:
 * Hourly flux concentration comparison utility added and synthetically validated with two technology cases, requested and intersected radius selection, Top90 hemisphere-percentage plots, global y-axis scaling, combined CSV output, and missing-radius error reporting.
 * Hourly maximum-flux bubble comparison utility added with fixed 0-4% Top90 hemisphere-percentage bubble-radius scaling.
 * Hourly maximum-flux radius-dependence plotting utility added for per-technology distance analysis across solar hours.
-* Inverse-square maximum-flux deviation plotting utility added for comparing observed radius decay against a 1/R^2 reference.
+* Inverse-square maximum-flux deviation plotting utility added for comparing observed radius decay against a 1/R^2 reference, with symmetric-log deviation scaling by default.
 
 ## Known Technical Debt
 

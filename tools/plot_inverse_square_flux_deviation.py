@@ -124,7 +124,20 @@ def deviation_range(rows):
     return minimum - padding, maximum + padding
 
 
-def write_case_plot(path, case, rows, radii, hours, labels_by_hour, y_limits, radius_scale, title_prefix, dpi):
+def write_case_plot(
+    path,
+    case,
+    rows,
+    radii,
+    hours,
+    labels_by_hour,
+    y_limits,
+    radius_scale,
+    deviation_scale,
+    deviation_symlog_linthresh,
+    title_prefix,
+    dpi,
+):
     plt = require_matplotlib()
     fig, ax = plt.subplots(figsize=(11.5, 6))
     fig.subplots_adjust(right=0.78)
@@ -148,6 +161,8 @@ def write_case_plot(path, case, rows, radii, hours, labels_by_hour, y_limits, ra
 
     if radius_scale == "log":
         ax.set_xscale("log")
+    if deviation_scale == "symlog":
+        ax.set_yscale("symlog", linthresh=deviation_symlog_linthresh)
 
     ax.axhline(0.0, color="#333333", linewidth=1.0, linestyle="--", alpha=0.8)
     ax.set_xticks(radii)
@@ -170,12 +185,37 @@ def write_case_plot(path, case, rows, radii, hours, labels_by_hour, y_limits, ra
     plt.close(fig)
 
 
-def write_plots(output_dir, cases, rows, radii, hours, y_limits, radius_scale, title_prefix, dpi):
+def write_plots(
+    output_dir,
+    cases,
+    rows,
+    radii,
+    hours,
+    y_limits,
+    radius_scale,
+    deviation_scale,
+    deviation_symlog_linthresh,
+    title_prefix,
+    dpi,
+):
     labels_by_hour = time_labels(cases, radii, hours)
     written = []
     for case in cases:
         path = output_dir / f"inverse_square_flux_deviation_{safe_filename_stem(case['label'])}.png"
-        write_case_plot(path, case, rows, radii, hours, labels_by_hour, y_limits, radius_scale, title_prefix, dpi)
+        write_case_plot(
+            path,
+            case,
+            rows,
+            radii,
+            hours,
+            labels_by_hour,
+            y_limits,
+            radius_scale,
+            deviation_scale,
+            deviation_symlog_linthresh,
+            title_prefix,
+            dpi,
+        )
         written.append(path)
     return written
 
@@ -219,6 +259,18 @@ def parse_args():
     )
     parser.add_argument("--title-prefix", default="Spring Equinox")
     parser.add_argument(
+        "--deviation-scale",
+        choices=("symlog", "linear"),
+        default="symlog",
+        help="Deviation-axis scale. Symlog is log-like away from zero but can show negative deviations and 0%%.",
+    )
+    parser.add_argument(
+        "--deviation-symlog-linthresh",
+        type=float,
+        default=10.0,
+        help="Half-width of the linear region around 0%% when --deviation-scale symlog is used.",
+    )
+    parser.add_argument(
         "--radius-scale",
         choices=("log", "linear"),
         default="log",
@@ -236,6 +288,8 @@ def main():
         raise ValueError("--deviation-ymin and --deviation-ymax must be provided together")
     if args.deviation_ymin is not None and args.deviation_ymin >= args.deviation_ymax:
         raise ValueError("--deviation-ymin must be smaller than --deviation-ymax")
+    if args.deviation_symlog_linthresh <= 0.0:
+        raise ValueError("--deviation-symlog-linthresh must be positive")
 
     cases = read_cases(args.case)
     radii = select_radii(cases, args.radii)
@@ -259,13 +313,26 @@ def main():
 
     csv_path = output_dir / "inverse_square_flux_deviation.csv"
     write_deviation_csv(csv_path, rows)
-    written_plots = write_plots(output_dir, cases, rows, radii, hours, y_limits, args.radius_scale, args.title_prefix, args.dpi)
+    written_plots = write_plots(
+        output_dir,
+        cases,
+        rows,
+        radii,
+        hours,
+        y_limits,
+        args.radius_scale,
+        args.deviation_scale,
+        args.deviation_symlog_linthresh,
+        args.title_prefix,
+        args.dpi,
+    )
 
     print(f"Analyzed {len(cases)} technology case(s).")
     print(f"Reference radius: {reference_radius:g} m")
     print(f"Radii: {', '.join(f'{radius:g}' for radius in radii)} m")
     print(f"Solar hours: {', '.join(f'{hour:g}' for hour in hours)}")
     print(f"Deviation y-axis range: {y_limits[0]:.10g} to {y_limits[1]:.10g} %")
+    print(f"Deviation y-axis scale: {args.deviation_scale}")
     if skipped:
         labels = [f"{label} at {hour:g}:00 ({reason})" for label, hour, reason in skipped]
         print(f"Skipped hour(s): {', '.join(labels)}")
