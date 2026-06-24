@@ -2,7 +2,7 @@
 
 ## Last updated
 
-2026-06-23
+2026-06-24
 
 ## Purpose
 
@@ -96,6 +96,7 @@ The companion `<output_prefix>_parameters.txt` file records the field list plus 
 * `tools/compare_hourly_flux_concentration.py` compares hourly flux-concentration CSV outputs across technology cases with separate Top90 hemisphere-percentage and maximum-flux line plots per radius.
 * `tools/compare_hourly_max_flux_bubbles.py` compares hourly maximum-flux curves across technology cases with Top90 hemisphere-percentage encoded as fixed-scale bubble radius.
 * `tools/plot_max_flux_vs_radius.py` plots maximum escaped flux versus hemisphere radius for each technology case, with separate curves for solar hours.
+* `tools/plot_inverse_square_flux_deviation.py` plots maximum-flux deviation from an ideal inverse-square radius decrease for each technology case and solar hour.
 
 ## Current Output Format
 
@@ -155,6 +156,7 @@ Contains:
 * Hourly flux concentration comparison utility added and synthetically validated with two technology cases, requested and intersected radius selection, Top90 hemisphere-percentage plots, global y-axis scaling, combined CSV output, and missing-radius error reporting.
 * Hourly maximum-flux bubble comparison utility added with fixed 0-4% Top90 hemisphere-percentage bubble-radius scaling.
 * Hourly maximum-flux radius-dependence plotting utility added for per-technology distance analysis across solar hours.
+* Inverse-square maximum-flux deviation plotting utility added for comparing observed radius decay against a 1/R^2 reference.
 
 ## Known Technical Debt
 
@@ -173,6 +175,7 @@ Contains:
 * Validate hourly flux concentration technology comparisons on representative real Spring Equinox case outputs.
 * Validate hourly maximum-flux bubble comparisons on representative real Spring Equinox technology outputs.
 * Validate maximum-flux radius-dependence plots on representative real Spring Equinox technology outputs.
+* Validate inverse-square maximum-flux deviation plots on representative real Spring Equinox technology outputs.
 
 ## Recommended Next Milestones
 
