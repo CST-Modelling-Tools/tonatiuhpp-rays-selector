@@ -15,6 +15,7 @@ REQUIRED_COLUMNS = (
     "Top90HemispherePercent",
     "MaxFlux_W_m2",
 )
+AVERAGE_FLUX_POWER_FRACTION = 0.90
 
 POINT_RE = re.compile(r"Point_(?P<number>\d+)")
 
@@ -52,6 +53,18 @@ def parse_float(value, path, row_number, column):
     if not math.isfinite(parsed):
         raise ValueError(f"CSV file contains non-finite value in column {column}: {path}")
     return parsed
+
+
+def parse_optional_float(value, path, row_number, column):
+    if value is None or not value.strip():
+        return None
+    return parse_float(value, path, row_number, column)
+
+
+def average_flux(total_power, radius, solid_angle):
+    if total_power is None or solid_angle <= 0.0:
+        return None
+    return AVERAGE_FLUX_POWER_FRACTION * total_power / (solid_angle * radius * radius)
 
 
 def parse_hour_from_time_label(value):
@@ -116,14 +129,20 @@ def read_case(label, path):
         for row_number, row in enumerate(reader, start=2):
             hour, label_text = row_time(row, path, row_number)
             radius = parse_float(row["Radius_m"], path, row_number, "Radius_m")
+            total_power = parse_optional_float(row.get("TotalPower_W"), path, row_number, "TotalPower_W")
             top90 = parse_float(row["Top90SolidAngle_sr"], path, row_number, "Top90SolidAngle_sr")
             percent = parse_float(row["Top90HemispherePercent"], path, row_number, "Top90HemispherePercent")
             max_flux = parse_float(row["MaxFlux_W_m2"], path, row_number, "MaxFlux_W_m2")
 
             if radius <= 0.0:
                 raise ValueError(f"CSV file contains non-positive radius in {path}, row {row_number}")
+            average_flux_value = average_flux(total_power, radius, top90)
             if top90 < 0.0 or percent < 0.0 or max_flux < 0.0:
                 raise ValueError(f"CSV file contains negative concentration or flux values in {path}, row {row_number}")
+            if total_power is not None and total_power < 0.0:
+                raise ValueError(f"CSV file contains negative total power in {path}, row {row_number}")
+            if average_flux_value is not None and average_flux_value < 0.0:
+                raise ValueError(f"CSV file contains negative average flux in {path}, row {row_number}")
 
             key = (radius, hour)
             if key in seen:
@@ -135,7 +154,8 @@ def read_case(label, path):
                 "time_label": label_text,
                 "hour": hour,
                 "Radius_m": radius,
-                "TotalPower_W": row.get("TotalPower_W", ""),
+                "TotalPower_W": total_power,
+                "AverageFlux_W_m2": average_flux_value,
                 "Top90SolidAngle_sr": top90,
                 "Top90HemispherePercent": percent,
                 "Top90BinCount": row.get("Top90BinCount", ""),
@@ -198,7 +218,9 @@ def format_value(row, column):
         return f"{row[column]:.10g}"
     if column == "Radius_m":
         return f"{row[column]:.10g}"
-    if column in ("Top90SolidAngle_sr", "MaxFlux_W_m2"):
+    if column in ("TotalPower_W", "AverageFlux_W_m2", "Top90SolidAngle_sr", "MaxFlux_W_m2"):
+        if row.get(column) is None:
+            return ""
         return f"{row[column]:.17g}"
     if column == "Top90HemispherePercent":
         return f"{row[column]:.10g}"

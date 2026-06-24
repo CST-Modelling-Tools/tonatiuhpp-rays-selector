@@ -1,4 +1,4 @@
-"""Plot maximum flux versus hemisphere radius for each technology case."""
+"""Plot maximum or average flux versus hemisphere radius for each technology case."""
 
 import argparse
 import csv
@@ -15,6 +15,20 @@ from compare_hourly_flux_concentration import (
 
 
 SUMMARY_CSV_NAME = "hourly_flux_concentration.csv"
+FLUX_METRICS = {
+    "maximum": {
+        "column": "MaxFlux_W_m2",
+        "label": "Maximum flux",
+        "description": "maximum escaped flux",
+        "stem": "max_flux",
+    },
+    "average": {
+        "column": "AverageFlux_W_m2",
+        "label": "Top90 average flux",
+        "description": "Top90 average escaped flux",
+        "stem": "top90_average_flux",
+    },
+}
 
 
 def require_matplotlib():
@@ -122,7 +136,15 @@ def write_selected_csv(path, cases, radii, hours):
             writer.writerow([format_value(row, column) for column in columns])
 
 
-def write_case_plot(path, case, radii, hours, labels_by_hour, flux_ymax, title_prefix, radius_scale, dpi):
+def metric_value(row, metric):
+    column = FLUX_METRICS[metric]["column"]
+    value = row.get(column)
+    if value is None:
+        raise ValueError(f"Input CSV does not provide enough data to compute {column}")
+    return value
+
+
+def write_case_plot(path, case, radii, hours, labels_by_hour, flux_metric, flux_ymax, title_prefix, radius_scale, dpi):
     plt = require_matplotlib()
     fig, ax = plt.subplots(figsize=(11.5, 6))
     fig.subplots_adjust(right=0.78)
@@ -133,7 +155,7 @@ def write_case_plot(path, case, radii, hours, labels_by_hour, flux_ymax, title_p
         if not rows:
             continue
         x_values = [row["Radius_m"] for row in rows]
-        y_values = [row["MaxFlux_W_m2"] for row in rows]
+        y_values = [metric_value(row, flux_metric) for row in rows]
         ax.plot(
             x_values,
             y_values,
@@ -150,8 +172,8 @@ def write_case_plot(path, case, radii, hours, labels_by_hour, flux_ymax, title_p
     ax.set_xticks(radii)
     ax.set_xticklabels([f"{radius:g}" for radius in radii], rotation=35, ha="right")
     ax.set_xlabel("Hemisphere radius [m]")
-    ax.set_ylabel("Maximum flux [W/m$^2$]")
-    ax.set_title(f"{title_prefix} maximum escaped flux versus radius - {case['label']}")
+    ax.set_ylabel(f"{FLUX_METRICS[flux_metric]['label']} [W/m$^2$]")
+    ax.set_title(f"{title_prefix} {FLUX_METRICS[flux_metric]['description']} versus radius - {case['label']}")
     ax.set_ylim(0.0, flux_ymax if flux_ymax > 0.0 else 1.0)
     ax.grid(True, alpha=0.35)
     ax.legend(
@@ -167,9 +189,9 @@ def write_case_plot(path, case, radii, hours, labels_by_hour, flux_ymax, title_p
     plt.close(fig)
 
 
-def filtered_global_max(cases, radii, hours):
+def filtered_global_max(cases, radii, hours, flux_metric):
     values = [
-        row["MaxFlux_W_m2"]
+        metric_value(row, flux_metric)
         for case in cases
         for row in case["rows"]
         if row_matches(row, radii, hours)
@@ -177,12 +199,12 @@ def filtered_global_max(cases, radii, hours):
     return max(values) if values else 0.0
 
 
-def write_plots(output_dir, cases, radii, hours, flux_ymax, title_prefix, radius_scale, dpi):
+def write_plots(output_dir, cases, radii, hours, flux_metric, flux_ymax, title_prefix, radius_scale, dpi):
     labels_by_hour = time_labels(cases, radii, hours)
     written = []
     for case in cases:
-        path = output_dir / f"max_flux_vs_radius_{safe_filename_stem(case['label'])}.png"
-        write_case_plot(path, case, radii, hours, labels_by_hour, flux_ymax, title_prefix, radius_scale, dpi)
+        path = output_dir / f"{FLUX_METRICS[flux_metric]['stem']}_vs_radius_{safe_filename_stem(case['label'])}.png"
+        write_case_plot(path, case, radii, hours, labels_by_hour, flux_metric, flux_ymax, title_prefix, radius_scale, dpi)
         written.append(path)
     return written
 
@@ -190,7 +212,7 @@ def write_plots(output_dir, cases, radii, hours, flux_ymax, title_prefix, radius
 def parse_args():
     parser = argparse.ArgumentParser(
         description=(
-            "For each technology case, plot hourly maximum escaped flux as a function "
+            "For each technology case, plot hourly maximum or average escaped flux as a function "
             "of hemisphere radius."
         )
     )
@@ -206,7 +228,13 @@ def parse_args():
     parser.add_argument("--radii", nargs="+", type=float, default=None, help="Radii in meters to plot.")
     parser.add_argument("--hours", nargs="+", type=float, default=None, help="Solar hours to plot, for example 9 10 15.")
     parser.add_argument("--output-dir", default=".", help="Folder for CSV and PNG outputs.")
-    parser.add_argument("--flux-ymax", type=float, default=None, help="Override maximum-flux plot y-axis maximum.")
+    parser.add_argument(
+        "--flux-metric",
+        choices=tuple(FLUX_METRICS),
+        default="maximum",
+        help="Flux metric to plot. Average flux is 90%% of TotalPower_W divided by the Top90 region area Top90SolidAngle_sr*R^2.",
+    )
+    parser.add_argument("--flux-ymax", type=float, default=None, help="Override flux plot y-axis maximum.")
     parser.add_argument("--title-prefix", default="Spring Equinox")
     parser.add_argument(
         "--radius-scale",
@@ -228,19 +256,20 @@ def main():
     cases = read_cases(args.case)
     radii = select_radii(cases, args.radii)
     hours = select_hours(cases, radii, args.hours)
-    flux_ymax = args.flux_ymax if args.flux_ymax is not None else filtered_global_max(cases, radii, hours) * 1.05
+    flux_ymax = args.flux_ymax if args.flux_ymax is not None else filtered_global_max(cases, radii, hours, args.flux_metric) * 1.05
 
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    csv_path = output_dir / "max_flux_vs_radius.csv"
+    csv_path = output_dir / f"{FLUX_METRICS[args.flux_metric]['stem']}_vs_radius.csv"
     write_selected_csv(csv_path, cases, radii, hours)
-    written_plots = write_plots(output_dir, cases, radii, hours, flux_ymax, args.title_prefix, args.radius_scale, args.dpi)
+    written_plots = write_plots(output_dir, cases, radii, hours, args.flux_metric, flux_ymax, args.title_prefix, args.radius_scale, args.dpi)
 
     print(f"Analyzed {len(cases)} technology case(s).")
+    print(f"Flux metric: {args.flux_metric}")
     print(f"Radii: {', '.join(f'{radius:g}' for radius in radii)} m")
     print(f"Solar hours: {', '.join(f'{hour:g}' for hour in hours)}")
-    print(f"Maximum-flux y-axis maximum: {flux_ymax:.10g} W/m^2")
+    print(f"Flux y-axis maximum: {flux_ymax:.10g} W/m^2")
     print(f"Wrote {csv_path}")
     for path in written_plots:
         print(f"Wrote {path}")

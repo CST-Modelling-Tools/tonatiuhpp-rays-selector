@@ -1,10 +1,12 @@
-"""Plot maximum-flux deviation from an ideal inverse-square radius decrease."""
+"""Plot flux deviation from an ideal inverse-square radius decrease."""
 
 import argparse
 import csv
 from pathlib import Path
 
 from plot_max_flux_vs_radius import (
+    FLUX_METRICS,
+    metric_value,
     read_cases,
     safe_filename_stem,
     select_hours,
@@ -32,7 +34,7 @@ def row_lookup(case):
     }
 
 
-def compute_deviation_rows(cases, radii, hours, reference_radius):
+def compute_deviation_rows(cases, radii, hours, reference_radius, flux_metric):
     rows = []
     skipped = []
 
@@ -44,7 +46,11 @@ def compute_deviation_rows(cases, radii, hours, reference_radius):
                 skipped.append((case["label"], hour, "missing reference radius"))
                 continue
 
-            reference_flux = reference["MaxFlux_W_m2"]
+            try:
+                reference_flux = metric_value(reference, flux_metric)
+            except ValueError:
+                skipped.append((case["label"], hour, "missing flux metric"))
+                continue
             if reference_flux <= 0.0:
                 skipped.append((case["label"], hour, "zero reference flux"))
                 continue
@@ -55,16 +61,17 @@ def compute_deviation_rows(cases, radii, hours, reference_radius):
                     continue
 
                 expected_flux = reference_flux * (reference_radius / radius) ** 2
-                actual_flux = row["MaxFlux_W_m2"]
+                actual_flux = metric_value(row, flux_metric)
                 ratio = actual_flux / expected_flux if expected_flux > 0.0 else 0.0
                 rows.append({
                     "Technology": case["label"],
+                    "FluxMetric": flux_metric,
                     "time_label": row["time_label"],
                     "hour": hour,
                     "ReferenceRadius_m": reference_radius,
                     "Radius_m": radius,
-                    "ReferenceMaxFlux_W_m2": reference_flux,
-                    "ActualMaxFlux_W_m2": actual_flux,
+                    "ReferenceFlux_W_m2": reference_flux,
+                    "ActualFlux_W_m2": actual_flux,
                     "InverseSquareExpectedFlux_W_m2": expected_flux,
                     "ActualToInverseSquareRatio": ratio,
                     "InverseSquareDeviationPercent": (ratio - 1.0) * 100.0,
@@ -76,12 +83,13 @@ def compute_deviation_rows(cases, radii, hours, reference_radius):
 def output_columns():
     return (
         "Technology",
+        "FluxMetric",
         "time_label",
         "hour",
         "ReferenceRadius_m",
         "Radius_m",
-        "ReferenceMaxFlux_W_m2",
-        "ActualMaxFlux_W_m2",
+        "ReferenceFlux_W_m2",
+        "ActualFlux_W_m2",
         "InverseSquareExpectedFlux_W_m2",
         "ActualToInverseSquareRatio",
         "InverseSquareDeviationPercent",
@@ -90,7 +98,7 @@ def output_columns():
 
 def format_value(row, column):
     value = row[column]
-    if column in ("Technology", "time_label"):
+    if column in ("Technology", "FluxMetric", "time_label"):
         return value
     if column in ("hour", "ReferenceRadius_m", "Radius_m"):
         return f"{value:.10g}"
@@ -135,6 +143,7 @@ def write_case_plot(
     radius_scale,
     deviation_scale,
     deviation_symlog_linthresh,
+    flux_metric,
     title_prefix,
     dpi,
 ):
@@ -168,8 +177,8 @@ def write_case_plot(
     ax.set_xticks(radii)
     ax.set_xticklabels([f"{radius:g}" for radius in radii], rotation=35, ha="right")
     ax.set_xlabel("Hemisphere radius [m]")
-    ax.set_ylabel("Deviation from 1/R$^2$ decrease [%]")
-    ax.set_title(f"{title_prefix} inverse-square flux deviation - {case['label']}")
+    ax.set_ylabel(f"Deviation from 1/R$^2$ {FLUX_METRICS[flux_metric]['label'].lower()} decrease [%]")
+    ax.set_title(f"{title_prefix} inverse-square {FLUX_METRICS[flux_metric]['description']} deviation - {case['label']}")
     ax.set_ylim(*y_limits)
     ax.grid(True, alpha=0.35)
     ax.legend(
@@ -195,13 +204,14 @@ def write_plots(
     radius_scale,
     deviation_scale,
     deviation_symlog_linthresh,
+    flux_metric,
     title_prefix,
     dpi,
 ):
     labels_by_hour = time_labels(cases, radii, hours)
     written = []
     for case in cases:
-        path = output_dir / f"inverse_square_flux_deviation_{safe_filename_stem(case['label'])}.png"
+        path = output_dir / f"inverse_square_{FLUX_METRICS[flux_metric]['stem']}_deviation_{safe_filename_stem(case['label'])}.png"
         write_case_plot(
             path,
             case,
@@ -213,6 +223,7 @@ def write_plots(
             radius_scale,
             deviation_scale,
             deviation_symlog_linthresh,
+            flux_metric,
             title_prefix,
             dpi,
         )
@@ -223,7 +234,7 @@ def write_plots(
 def parse_args():
     parser = argparse.ArgumentParser(
         description=(
-            "For each technology case, compare the maximum escaped flux decrease with "
+            "For each technology case, compare maximum or average escaped flux decrease with "
             "the ideal 1/R^2 decrease from a reference radius."
         )
     )
@@ -245,6 +256,12 @@ def parse_args():
         help="Radius used as the inverse-square reference. Defaults to the smallest selected radius.",
     )
     parser.add_argument("--output-dir", default=".", help="Folder for CSV and PNG outputs.")
+    parser.add_argument(
+        "--flux-metric",
+        choices=tuple(FLUX_METRICS),
+        default="maximum",
+        help="Flux metric to compare. Average flux is 90%% of TotalPower_W divided by the Top90 region area Top90SolidAngle_sr*R^2.",
+    )
     parser.add_argument(
         "--deviation-ymin",
         type=float,
@@ -298,7 +315,7 @@ def main():
     if reference_radius not in radii:
         raise ValueError("--reference-radius must be one of the selected radii")
 
-    rows, skipped = compute_deviation_rows(cases, radii, hours, reference_radius)
+    rows, skipped = compute_deviation_rows(cases, radii, hours, reference_radius, args.flux_metric)
     if not rows:
         raise ValueError("No deviation rows were produced. Check that reference-radius flux is positive.")
 
@@ -311,7 +328,7 @@ def main():
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    csv_path = output_dir / "inverse_square_flux_deviation.csv"
+    csv_path = output_dir / f"inverse_square_{FLUX_METRICS[args.flux_metric]['stem']}_deviation.csv"
     write_deviation_csv(csv_path, rows)
     written_plots = write_plots(
         output_dir,
@@ -323,11 +340,13 @@ def main():
         args.radius_scale,
         args.deviation_scale,
         args.deviation_symlog_linthresh,
+        args.flux_metric,
         args.title_prefix,
         args.dpi,
     )
 
     print(f"Analyzed {len(cases)} technology case(s).")
+    print(f"Flux metric: {args.flux_metric}")
     print(f"Reference radius: {reference_radius:g} m")
     print(f"Radii: {', '.join(f'{radius:g}' for radius in radii)} m")
     print(f"Solar hours: {', '.join(f'{hour:g}' for hour in hours)}")

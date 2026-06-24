@@ -21,6 +21,7 @@ SUMMARY_COLUMNS = (
     "hour",
     "Radius_m",
     "TotalPower_W",
+    "AverageFlux_W_m2",
     "Top90SolidAngle_sr",
     "Top90HemispherePercent",
     "Top90BinCount",
@@ -161,6 +162,12 @@ def top_power_region(power, solid_angles, fraction):
     return solid_angle, hemisphere_percent, int(selected.size)
 
 
+def average_flux_in_top_region(total_power, radius, solid_angle, fraction):
+    if total_power <= 0.0 or radius <= 0.0 or solid_angle <= 0.0:
+        return 0.0
+    return fraction * total_power / (solid_angle * radius * radius)
+
+
 def find_point_number(path, input_folder):
     for parent in path.parents:
         match = POINT_FOLDER_RE.match(parent.name)
@@ -210,12 +217,14 @@ def analyze_flux_file(hour, radius, path, top_fraction):
         top_fraction,
     )
 
+    total_power = float(np.sum(data["power_W"]))
     max_flux_index = int(np.argmax(data["flux_W_m2"]))
     return {
         "time_label": time_label(hour),
         "hour": hour,
         "Radius_m": radius,
-        "TotalPower_W": float(np.sum(data["power_W"])),
+        "TotalPower_W": total_power,
+        "AverageFlux_W_m2": average_flux_in_top_region(total_power, radius, top90_solid_angle, top_fraction),
         "Top90SolidAngle_sr": top90_solid_angle,
         "Top90HemispherePercent": top90_percent,
         "Top90BinCount": top90_bin_count,
@@ -237,6 +246,7 @@ def write_summary_csv(path, results):
                 result["hour"],
                 f"{result['Radius_m']:.10g}",
                 f"{result['TotalPower_W']:.17g}",
+                f"{result['AverageFlux_W_m2']:.17g}",
                 f"{result['Top90SolidAngle_sr']:.17g}",
                 f"{result['Top90HemispherePercent']:.10g}",
                 result["Top90BinCount"],
@@ -335,12 +345,14 @@ def print_summary(results, summary_csv, summary_png):
     solid_angles = np.array([result["Top90SolidAngle_sr"] for result in results], dtype=np.float64)
     percentages = np.array([result["Top90HemispherePercent"] for result in results], dtype=np.float64)
     max_flux = np.array([result["MaxFlux_W_m2"] for result in results], dtype=np.float64)
+    average_flux = np.array([result["AverageFlux_W_m2"] for result in results], dtype=np.float64)
 
     print(f"Analyzed {len(results)} hour/radius combinations.")
     print(f"Wrote {summary_csv}")
     print(f"Wrote {summary_png}")
     print(f"Top90SolidAngle_sr range: {np.min(solid_angles):.6g} to {np.max(solid_angles):.6g}")
     print(f"Top90HemispherePercent range: {np.min(percentages):.6g} to {np.max(percentages):.6g}")
+    print(f"AverageFlux_W_m2 range: {np.min(average_flux):.6g} to {np.max(average_flux):.6g}")
     print(f"MaxFlux_W_m2 range: {np.min(max_flux):.6g} to {np.max(max_flux):.6g}")
 
 
